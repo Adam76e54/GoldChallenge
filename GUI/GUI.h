@@ -2,10 +2,11 @@
 
 #include <Arduino.h>
 #include <WiFiS3.h>
-#include "State.h"
+#include "GlobalObjects.h"
 #include "Buffer.h"
 #include "Commands.h"
 #include "NetworkSetup.h"
+#include "Arduino_FreeRTOS.h"
 
 constexpr uint8_t N = 200;
 extern Buffer<N> in;
@@ -33,19 +34,30 @@ bool read(WiFiClient& GUI, Buffer<N>& buffer){
 }
 
 template <uint8_t N>
-void handle(Buffer<N>& buffer){
+void enqueue(Buffer<N>& buffer, QueueHandle_t queue){
   if(buffer.available() > 0){
-    constexpr uint8_t N = 64;
+    constexpr unsigned int WAIT_TIME = 100;
+
     char message [N];
 
     const uint8_t messageSize = buffer.read(message, N);
 
     if(!message) return;
 
+    // Get function opcode as a char
     char function = message[0];
-    const char* value = (messageSize > 2) ? message[2] : nullptr;
+    // Get a value if it exists (we take a pointer to the rest of the string)
+    const char* value = (messageSize > 2) ? &message[2] : nullptr;
 
-    auto handle = comm::handlerTable[static_cast<uint8_t>(function)];
+    // Initialise a command to be sent
+    Command command {
+      comm::handlerTable[static_cast<uint8_t>(function)],
+      value
+    };
+
+    if(command.function != nullptr){
+      xQueueSend(commandQueue, &command, pdMS_TO_TICKS(WAIT_TIME));  // or a timeout instead of 0
+    }
 
   }
 }

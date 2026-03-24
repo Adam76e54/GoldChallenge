@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <WiFiS3.h>
-#include "State.h"
+#include "GlobalObjects.h"
 #include "Buffer.h"
 #include "Commands.h"
 #include "NetworkSetup.h"
@@ -14,7 +14,7 @@ void telemetry(void*){
   WiFiClient GUI;
   WiFiServer server;
 
-  Buffer<200> in;
+  Buffer<128> in;
 
   server.begin(wifi::PORT);
   wifi::initialiseAccessPoint();
@@ -24,7 +24,7 @@ void telemetry(void*){
 
     read(GUI, in);
 
-    handle(in);
+    enqueue(in, commandQueue);
 
 
     xTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(period));

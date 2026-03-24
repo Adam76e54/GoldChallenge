@@ -6,5 +6,7 @@
 #include "NetworkSetup.h"
 #include "ROB12629.h"
 #include "GUI.h"
+#include "GlobalObjects.h"
 #include "Controller.h"
 #include "Arduino_FreeRTOS.h"
+#include "Telemetry.h"
