@@ -18,4 +18,7 @@ namespace comm
   constexpr char KP = 'S';
   constexpr char KI = 'T';
   constexpr char KD = 'U';
+
+  static void (*handlerTable[256])(char command, void* payload) = {nullptr};
 }
+

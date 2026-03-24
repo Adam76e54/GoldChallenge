@@ -35,101 +35,21 @@ bool read(WiFiClient& GUI, Buffer<N>& buffer){
 template <uint8_t N>
 void handle(Buffer<N>& buffer){
   if(buffer.available() > 0){
-    mappingHandle(buffer);
+    constexpr uint8_t N = 64;
+    char message [N];
+
+    const uint8_t messageSize = buffer.read(message, N);
+
+    if(!message) return;
+
+    char function = message[0];
+    const char* value = (messageSize > 2) ? message[2] : nullptr;
+
+    auto handle = comm::handlerTable[static_cast<uint8_t>(function)];
+
   }
 }
 
-template <uint8_t N>
-void mappingHandle(Buffer<N>& buffer){
-  char command[N];
-
-  Serial.println("Entered mapping handle");
-
-  if(buffer.read(command, N) == 0){
-    return;
-  }
-
-  Serial.println(command);
-
-  // Serial.println();
-
-  if(command == nullptr) return;
-
-  const char* value = &command[2];
-  char function = command[0]; 
-
-  Serial.println(function);
-
-  if (function == comm::FORWARD){
-    state.activity = FORWARD;
-    Serial.println("Changed to forward");
-  }
-  else if (function == comm::TURN_LEFT){
-    state.activity = LEFT;
-    Serial.println("Changed to left");
-
-  }
-  else if (function == comm::TURN_RIGHT){
-    state.activity = RIGHT;
-    Serial.println("Changed to right");
-
-  } 
-  else if (function == comm::MATCH_WHEELS){
-    state.activity = MATCHING;
-  } 
-  else if(function == comm::CALIBRATE_LEFT){
-    state.activity = CALIBRATING_LEFT;
-  }
-  else if(function == comm::CALIBRATE_RIGHT){
-    state.activity = CALIBRATING_RIGHT;
-  }  
-  else if(function == comm::SAVE_EEPROM){
-    state.activity = SAVING_EEPROM;
-  }
-  else if(function == comm::CHANGE_TARGET){
-    if(command[1] == comm::DELIMITER){
-      state.targetDistance = atof(value);
-    }
-
-  } 
-  else if(function == comm::LEFT_SPEED){
-    if(command[1] == comm::DELIMITER){
-      state.leftForwardPercentage = atof(value);
-    Serial.print("Changed left to "); Serial.println(state.leftForwardPercentage);
-
-    }
-  }
-  else if(function == comm::RIGHT_SPEED){
-    if(command[1] == comm::DELIMITER){
-      state.rightForwardPercentage = atof(value);
-    }
-  }
-  else if(function == comm::RIGHT_FACTOR){
-    if(command[1] == comm::DELIMITER){
-      state.rightTurnFactor = atof(value);
-    }
-  }
-  else if(function == comm::LEFT_FACTOR){
-    if(command[1] == comm::DELIMITER){
-      state.leftTurnFactor = atof(value);
-    }
-  }
-  else if(function == comm::KP){
-    if(command[1] == comm::DELIMITER){
-      state.kp = atof(value);
-    }
-  }
-  else if(function == comm::KI){
-    if(command[1] == comm::DELIMITER){
-      state.ki = atof(value);
-    }
-  }
-  else if(function == comm::KD){
-    if(command[1] == comm::DELIMITER){
-      state.kd = atof(value);
-    }
-  }
-}
 
 void sendEvent(WiFiClient& GUI, const char* event){
   if(GUI && GUI.connected()){
