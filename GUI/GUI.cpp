@@ -1,5 +1,5 @@
-#pragma once
 
+#include "GUI.h"
 #include <Arduino.h>
 #include <WiFiS3.h>
 #include "GlobalObjects.h"
@@ -8,12 +8,12 @@
 #include "NetworkSetup.h"
 #include "Arduino_FreeRTOS.h"
 
-extern Buffer<N> in;
-extern WiFiServer server;
-extern WiFiClient GUI;
-
 // Keep connection alive
-void keep(WiFiClient& GUI, WiFiServer& server);
+void keep(WiFiClient& GUI, WiFiServer& server){
+  if(!GUI){
+    GUI = server.available();
+  }
+}
 
 //read command into buffer
 template <uint8_t N> 
@@ -57,6 +57,40 @@ void enqueue(Buffer<N>& buffer, QueueHandle_t queue){
   }
 }
 
-void sendEvent(WiFiClient& GUI, const char* event);
 
-void sendEvent(WiFiClient& GUI, const char* event, float num);
+void sendEvent(WiFiClient& GUI, const char* event){
+  if(GUI && GUI.connected()){
+    char message[128];
+
+    int n = snprintf(message, sizeof(message), "%c%c%s", comm::EVENT, comm::DELIMITER, event);
+
+    if(n > 0 && n < (int)sizeof(message)){
+      GUI.println(message);
+    }
+
+    // GUI.print(comm::EVENT);
+    // GUI.print(comm::DELIMITER);
+    // GUI.println(message);
+  }
+}
+
+void sendEvent(WiFiClient& GUI, const char* event, float num){
+  if(GUI && GUI.connected()){
+    char message[128];
+    char numberAsString[16];
+
+    dtostrf(num, 8, 2, numberAsString); // apparently %f printf() is disabled by default and this is preferred, no idea why
+
+    int n = snprintf(message, sizeof(message), "%c%c%s%c%s",
+      comm::EVENT, comm::DELIMITER, event, comm::DELIMITER, numberAsString);
+
+    if(n > 0 && n < (int)sizeof(message)){
+      GUI.println(message);
+    }
+
+    // GUI.print(comm::EVENT);
+    // GUI.print(comm::DELIMITER);
+    // GUI.print(message);
+    // GUI.println(num);
+  }
+}

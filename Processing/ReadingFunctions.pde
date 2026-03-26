@@ -1,5 +1,5 @@
 interface CommandHandler {
-  void handle(String payload); 
+  void handle(Character payload); 
 }
 
 void read(Client sam) {
@@ -18,10 +18,10 @@ void read(Client sam) {
   String cmd = line.substring(0, firstColon);
   String payload = trim(line.substring(firstColon + 1));
 
-  CommandHandler h = handlers.get(cmd);
+  CommandHandler h = handlers.get(cmd.charAt(0));
   
   if (h != null) {
-    h.handle(payload);
+    h.handle(payload.charAt(0));
   } else {
      println("Unknown command: " + cmd);
   }
@@ -34,7 +34,7 @@ void setupCommandsHandlers(){
 // It makes read() more legible because it's just fethcing a handler from a table and executing it
 
   handlers.put(comm_LEFT_IR, new CommandHandler() {
-    public void handle(String payload){
+    public void handle(Character payload){
       // we can put function in here and have the hash figure it out in void read()
     }
       
