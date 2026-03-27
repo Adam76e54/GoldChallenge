@@ -30,44 +30,51 @@ void setup(){
   int size = 60;
   
   for(int i = 0; i < sizeOfArrays; i++){
-    String name = "Time" + i;
     String label = "" + i;
     
-    Textfield field = makeTextfield(panel, name, timesX + i*size, timesY, size, size, label);
+    Textfield field = makeTextfield(panel, 
+                                    Character.toString(comm_TIMES.get(i)), 
+                                    timesX + i*size, 
+                                    timesY, 
+                                    size, size, label);
     
     timeTextfields.add(field);
   }
   
   for(int i = 0; i < sizeOfArrays; i++){
-    String name = "Speed" + i;
     String label = "" + i;
     
-    Textfield field = makeTextfield(panel, name, timesX + i*size, timesY + 2*size, size, size, label);
+    Textfield field = makeTextfield(panel, 
+                                    Character.toString(comm_SPEEDS.get(i)), 
+                                    timesX + i*size, 
+                                    timesY + 2*size, 
+                                    size, size, label);
     
     speedTextfields.add(field);
   }
   
   for(int i = 0; i < 3; i++){
-    String name = "", label = "";
+    String name = Character.toString(PID[i]), label = "";
     
     switch(i){
       case 0:
-        name = "KP";
         label = "P";
       break;
       
       case 1:
-        name = "KI";
         label = "I";
       break;
       
       case 2:
-        name = "KD";
         label = "D";
       break;
     }  
     
-    Textfield field = makeTextfield(panel, name, timesX + i*size, timesY + 4*size, size, size, label);
+    Textfield field = makeTextfield(panel, 
+                                    name, 
+                                    timesX + i*size, 
+                                    timesY + 4*size, 
+                                    size, size, label);
     
     
     PIDTextfields.add(field);
@@ -80,10 +87,12 @@ void setup(){
   leftIR = makeTextlabel(panel, "LeftIR", 1000, 50, "Left IR sensor = 0");
   rightIR = makeTextlabel(panel, "RightIR", 1000, 80, "Right IR sensor = 0");
   
-  leftSlider = makeSlider(panel, "LeftSlider", 1020, 120, 30, 300, 0, 1, "Left");  
-  rightSlider = makeSlider(panel, "RightSlider", 1070, 120, 30, 300, 0, 1, "Right");  
+  leftSlider = makeSlider(panel, Character.toString(comm_LEFT_IR), 1020, 120, 30, 300, 0, 1, "Left");  
+  leftSlider.setValue(0.3);
+  rightSlider = makeSlider(panel, Character.toString(comm_RIGHT_IR), 1090, 120, 30, 300, 0, 1, "Right");  
+  rightSlider.setValue(0.3);
   
-  stopToggle = makeToggle(panel, "StopToggle", 540, 100, 150, 70, "Stop/Start");
+  stopToggle = makeToggle(panel, Character.toString(comm_STOP_TOGGLE), 540, 100, 150, 70, "Stop/Start");
 }
 
 void draw(){

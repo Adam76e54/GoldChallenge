@@ -15,7 +15,8 @@ Textfield makeTextfield(ControlP5 controller, String name, int x, int y, int w, 
     .setAutoClear(false)
     .setInputFilter(ControlP5.FLOAT)
     .setLabel(label)
-    .setFont(createFont("Arial", 30));
+    .setFont(createFont("Arial", 30))
+    .setText("0");
     
     field.getCaptionLabel()
       .setColor(color(0))
@@ -35,19 +36,25 @@ Textlabel makeTextlabel(ControlP5 controller, String name, int x, int y, String 
   return label;
 }
 
-Slider makeSlider(ControlP5 controller, String name, int x, int y, int w, int h, float start, float end, String label){
+Slider makeSlider(ControlP5 controller, String name, int x, int y, int w, int h,
+                  float start, float end, String label){
   Slider slider = controller.addSlider(name)
     .setPosition(x,y)
     .setSize(w,h)
     .setRange(start, end)
     .setTriggerEvent(Slider.RELEASE);
-    
+
+  // Caption (static text)
   slider.getCaptionLabel()
     .setColor(color(0))
     .setFont(createFont("Arial", 14))
     .setText(label);
-  
-  
+
+  // Value label (numeric value)
+  slider.getValueLabel()
+    .setColor(color(0))                  // black
+    .setFont(createFont("Arial", 12));   // optional: tweak size
+
   return slider;
 }
 
@@ -93,14 +100,28 @@ GPointsArray makeGPointsArray(ArrayList<Float> x, ArrayList<Float> y){
   return array;
 }
 
-Toggle makeToggle(ControlP5 controller, String name, int x, int y, int w, int h, String label){
+Toggle makeToggle(ControlP5 controller, String name,
+                  int x, int y, int w, int h, String label){
+
   Toggle toggle = controller.addToggle(name)
                             .setPosition(x, y)
                             .setSize(w, h)
                             .setCaptionLabel(label);
-                            
-  toggle.getCaptionLabel().align(ControlP5.CENTER, ControlP5.CENTER).setPaddingX(0).setPaddingY(0).setFont(createFont("Arial", 16));
-  toggle.setValue(true); 
-  
+
+  toggle.getCaptionLabel()
+        .align(ControlP5.CENTER, ControlP5.CENTER)
+        .setPaddingX(0)
+        .setPaddingY(0)
+        .setFont(createFont("Arial", 16));
+
+  // Deep red when ON (stopped = true)
+  toggle.setColorForeground(color(150, 0, 0));   // knob/outline when ON
+  toggle.setColorActive(color(200, 0, 0));       // fill when ON
+
+  // Deep green when OFF (stopped = false)
+  toggle.setColorBackground(color(0, 90, 0));    // background when OFF
+
+  toggle.setValue(true);   // start in "stopped" state (red)
+
   return toggle;
 }
