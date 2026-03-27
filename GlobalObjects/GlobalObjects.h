@@ -4,7 +4,10 @@
 #include <Arduino_FreeRTOS.h>
 // - RTOS OBJECTS -
 extern QueueHandle_t commandQueue;
-extern SemaphoreHandle_t sensorSemaphore;
+extern SemaphoreHandle_t sensorSemaphore, 
+                         PIDSemaphore, 
+                         arraySemaphore,
+                         stoppedSemaphore;
 // - STRUCS -
 struct Sensors{
   uint16_t left = 0;
