@@ -6,6 +6,7 @@
 #include "Buffer.h"
 #include "Commands.h"
 #include "NetworkSetup.h"
+#include "GUI.h"
 
 void telemetry(void*){
   constexpr TickType_t period = pdMS_TO_TICKS(500);
