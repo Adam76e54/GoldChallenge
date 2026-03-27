@@ -46,8 +46,17 @@ class ROB12629{
       return count;
     }
 
+    unsigned long lastEdgeTime() const {
+        noInterrupts();
+        auto t = lastISRTime_;
+        interrupts();
+        return t;
+    }
+
     void reset(){
+      noInterrupts();
       count_ = 0;
+      interrupts();
     }
 
     uint8_t pin() const{
