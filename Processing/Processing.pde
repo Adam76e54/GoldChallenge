@@ -9,11 +9,11 @@ void setup(){
   noStroke();
   rectMode(CENTER);
   
-  ////connect to sam
-  //sam = new Client(this, IP, PORT);
-  //if( sam != null && sam.active()){
-  //  //sam.write("Connected");//this is actually essential. WiFiServer::available() only pulls in client who have data waiting so we need to write something to be seen
-  //}
+  //connect to sam
+  sam = new Client(this, IP, PORT);
+  if( sam != null && sam.active()){
+    sam.write("Connected");//this is actually essential. WiFiServer::available() only pulls in client who have data waiting so we need to write something to be seen
+  }
   
   panel = new ControlP5(this);
   
@@ -84,8 +84,8 @@ void setup(){
   speedTextlabel = makeTextlabel(panel, "__SpeedTextlabel", 15, timesY + 5 + 2*size, "Speeds");
   PIDTextlabel = makeTextlabel(panel, "__PIDTextlabel", 15, timesY + 5 + 4*size, "Constants");
 
-  leftIR = makeTextlabel(panel, "LeftIR", 1000, 50, "Left IR sensor = 0");
-  rightIR = makeTextlabel(panel, "RightIR", 1000, 80, "Right IR sensor = 0");
+  leftIR = makeTextlabel(panel, Character.toString(comm_LEFT_IR_IN), 1000, 50, "Left IR sensor = 0");
+  rightIR = makeTextlabel(panel, Character.toString(comm_RIGHT_IR_IN), 1000, 80, "Right IR sensor = 0");
   
   leftSlider = makeSlider(panel, Character.toString(comm_LEFT_IR), 1020, 120, 30, 300, 0, 1, "Left");  
   leftSlider.setValue(0.3);
@@ -93,14 +93,19 @@ void setup(){
   rightSlider.setValue(0.3);
   
   stopToggle = makeToggle(panel, Character.toString(comm_STOP_TOGGLE), 540, 100, 150, 70, "Stop/Start");
+  
+  setupCommandHandlers();
 }
 
 void draw(){
-  //if(sam == null || !sam.active()){
-  //  if(frameCount % 120 == 0){
-  //    sam = new Client(this, IP, PORT);
-  //  }
-  //}
+  if (sam == null || !sam.active()) {
+    if (frameCount % 120 == 0) {
+      sam = new Client(this, IP, PORT);
+      if (sam != null && sam.active()) {
+        sam.write("hi\n");
+      }
+    }
+  }
   
   background(255);
   fill(0);
