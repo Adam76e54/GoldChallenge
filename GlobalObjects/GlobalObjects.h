@@ -8,24 +8,25 @@ extern SemaphoreHandle_t sensorSemaphore,
                          PIDSemaphore, 
                          arraySemaphore,
                          stoppedSemaphore;
+extern TaskHandle_t moveTaskHandle;
 // - STRUCS -
 struct Sensors{
   uint16_t left = 0;
   uint16_t right = 0;
-} sensors;
+};
 
 struct SpeedPercentages {
   // Current percentage to feed to driver
   float left = 0;
   float right = 0;
-} speedPercentages;
+};
 
 struct PIDCoefficients {
   // PID control
   float kp = 0.0;
   float ki = 0.0;
   float kd = 0.0;
-} straightening, matching;
+};
 
 struct Arrays{
   // Time and speed arrays
@@ -35,7 +36,7 @@ struct Arrays{
 
   unsigned int actualTimes[ARRAY_SIZE];
   unsigned int actualSpeeds[ARRAY_SIZE];
-} data;
+} ;
 
 // EEPROM addresses
 constexpr unsigned int LEFT_PERCENTAGE_ADDRESS = 0;
@@ -46,4 +47,10 @@ constexpr unsigned int KD_ADDRESS = KI_ADDRESS + sizeof(float);
 
 struct DriverState{
   bool stopped = true;
-} state;
+} ;
+
+extern Sensors sensors;
+extern SpeedPercentages speedPercentage;
+extern PIDCoefficients speedMatching;
+extern Arrays data;
+extern DriverState state;
