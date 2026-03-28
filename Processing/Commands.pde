@@ -15,9 +15,9 @@ final char comm_CURRENT_SPEED = 'H';
 final char comm_SAVE_EEPROM = 'I';
   
 final ArrayList<Character> comm_TIMES = new ArrayList<Character>(
-  Arrays.asList('1', '2', '3', '4', '5')
+  Arrays.asList('0', '1', '2', '3', '4')
 );
 
 final ArrayList<Character> comm_SPEEDS = new ArrayList<Character>(
-  Arrays.asList('0', '6', '7', '8', '9')
+  Arrays.asList('5', '6', '7', '8', '9')
 );

@@ -11,13 +11,16 @@
 
 constexpr uint8_t N = 128;
 
+void sendBack(const unsigned char comm, const char* value);
 void keep(WiFiClient& GUI, WiFiServer& server);
 
 template <uint8_t N> 
 bool read(WiFiClient& GUI, Buffer<N>& buffer);
 
 template <uint8_t N>
-void enqueue(Buffer<N>& buffer, QueueHandle_t queue);
+void handle(Buffer<N>& buffer);
+
+
 
 void telemetry(void*){
   constexpr TickType_t period = pdMS_TO_TICKS(100);
@@ -42,7 +45,7 @@ void telemetry(void*){
 
     read(GUI, in);
 
-    enqueue(in, commandQueue);
+    handle(in);
   }
 }
 
@@ -52,6 +55,10 @@ void keep(WiFiClient& GUI, WiFiServer& server){
     if (GUI) GUI.stop();
     GUI = server.available();
   }
+}
+
+void sendBack(WiFiClient GUI, const unsigned char comm, const char* value){
+  GUI.print(comm); GUI.print(comm::DELIMITER); GUI.println(value);
 }
 
 //read command into buffer
@@ -68,7 +75,7 @@ bool read(WiFiClient& GUI, Buffer<N>& buffer){
 }
 
 template <uint8_t N>
-void enqueue(Buffer<N>& buffer, QueueHandle_t queue){
+void handle(Buffer<N>& buffer){
 
   if(buffer.available() > 0){
     constexpr unsigned int WAIT_TIME = 100;
@@ -80,7 +87,8 @@ void enqueue(Buffer<N>& buffer, QueueHandle_t queue){
     Serial.println(message);
     
     // Get function opcode as a char
-    char function = message[0];
+    unsigned char name = static_cast<unsigned char>(message[0]);
+    auto function = comm::handlerTable[name];
     // Get a value if it exists (we take a pointer to the rest of the string)
     const char* value = (messageSize > 2) ? &message[2] : nullptr;
 
@@ -88,13 +96,12 @@ void enqueue(Buffer<N>& buffer, QueueHandle_t queue){
     // Serial.print("Value = "); Serial.println(value);
     // Initialise a command to be sent
     Command command {
-      comm::handlerTable[static_cast<uint8_t>(function)],
+      name,
       value
     };
 
-    if(command.function != nullptr){
-      command.function(value);
-      // xQueueSend(queue, &command, pdMS_TO_TICKS(WAIT_TIME));
+    if(function != nullptr){
+      function(command);
     }
 
   }
