@@ -19,10 +19,6 @@ class ROB12629{
 
     //requires us to feed an ISR to it
     void begin(void (*ISR)()){
-      if(pin_ != 2 && pin_ != 3){
-        Serial.println("You're not using interrupt pins !!!");
-      }
-
       pinMode(pin_, INPUT_PULLUP);
       attachInterrupt(digitalPinToInterrupt(pin_), ISR, CHANGE);
     }
