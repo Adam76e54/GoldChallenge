@@ -4,7 +4,7 @@
 
 class ROB12629{
   private:
-    uint8_t pin_;//one digital pin
+    const uint8_t pin_;//one digital pin
     volatile unsigned long count_;
     volatile unsigned long lastISRTime_;
 
@@ -36,23 +36,23 @@ class ROB12629{
     }
 
     unsigned long count() const{
-      noInterrupts();
+      taskENTER_CRITICAL();
       auto count = count_;
-      interrupts();
+      taskEXIT_CRITICAL();
       return count;
     }
 
     unsigned long lastEdgeTime() const {
-        noInterrupts();
+        taskENTER_CRITICAL();
         auto t = lastISRTime_;
-        interrupts();
+        taskEXIT_CRITICAL();
         return t;
     }
 
     void reset(){
-      noInterrupts();
+      taskENTER_CRITICAL();
       count_ = 0;
-      interrupts();
+      taskEXIT_CRITICAL();
     }
 
     uint8_t pin() const{
