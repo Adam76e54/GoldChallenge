@@ -90,7 +90,6 @@ void forward(L293D& driver, HCSR04& ears,
   constexpr uint8_t MAX_CMS = 50; // For initial guess at speeds
 
   uint8_t idx = 0;
-  
   unsigned int currentTargetSpeed = targetSpeeds[idx];
   unsigned int changeTime = targetTimes[idx];
 
@@ -106,7 +105,6 @@ void forward(L293D& driver, HCSR04& ears,
   unsigned long lastLeftCount = 0, lastRightCount = 0;
 
   float leftMeasurement_cms = 0, rightMeasurement_cms = 0;
-  uint8_t idx = 0;
   bool stopped = false;
   
   bool timeout = false;
