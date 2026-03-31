@@ -9,10 +9,24 @@ Textlabel leftIR,
 
 ControlP5 panel;
 
+Textfield turningTextfield;
+
 final int sizeOfArrays = 5;
 ArrayList<Textfield> timeTextfields = new ArrayList<Textfield>(sizeOfArrays);
 ArrayList<Textfield> speedTextfields = new ArrayList<Textfield>(sizeOfArrays);
 ArrayList<Textfield> PIDTextfields = new ArrayList<Textfield>(3);
+
+ArrayList<Boolean> timeFocuses = new ArrayList<Boolean>(
+  Arrays.asList(false, false, false, false, false)
+);
+ArrayList<Boolean> speedFocuses = new ArrayList<Boolean>(
+  Arrays.asList(false, false, false, false, false)
+);
+ArrayList<Boolean> PIDFocuses = new ArrayList<Boolean>(
+  Arrays.asList(false, false, false, false, false)
+);
+
+
 
 Slider leftSlider, rightSlider;
 

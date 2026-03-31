@@ -1,5 +1,5 @@
 interface CommandHandler {
-  void handle(Character payload); 
+  void handle(String payload); 
 }
 
 void read(Client sam) {
@@ -21,7 +21,7 @@ void read(Client sam) {
   CommandHandler h = handlers.get(cmd.charAt(0));
   
   if (h != null) {
-    h.handle(payload.charAt(0));
+    h.handle(payload);
   } else {
      println("Unknown command: " + cmd);
   }
@@ -34,9 +34,16 @@ void setupCommandHandlers(){
 // It makes read() more legible because it's just fethcing a handler from a table and executing it
 
   handlers.put(comm_LEFT_IR, new CommandHandler() {
-    public void handle(Character payload){
+    public void handle(String payload){
       // we can put function in here and have the hash figure it out in void read()
-      
+      leftIR.setText("Left IR sensor = " + payload);
+    }
+  });
+  
+  handlers.put(comm_RIGHT_IR, new CommandHandler() {
+    public void handle(String payload){
+      // we can put function in here and have the hash figure it out in void read()
+      rightIR.setText("Right IR sensor = " + payload);
     }
   });
   

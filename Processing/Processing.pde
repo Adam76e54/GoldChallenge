@@ -10,10 +10,7 @@ void setup(){
   rectMode(CENTER);
   
   //connect to sam
-  sam = new Client(this, IP, PORT);
-  if( sam != null && sam.active()){
-    sam.write("Connected");//this is actually essential. WiFiServer::available() only pulls in client who have data waiting so we need to write something to be seen
-  }
+  if(sam != null) setupClient(sam);
   
   panel = new ControlP5(this);
   
@@ -29,6 +26,12 @@ void setup(){
   int timesX = 100, timesY = 10;
   int size = 60;
   
+  turningTextfield = makeTextfield(panel, 
+                                   Character.toString(comm_TURNING_FACTOR),
+                                   1040, 
+                                   500, 
+                                   size, size, "Turning Factor");
+                                   
   for(int i = 0; i < sizeOfArrays; i++){
     String label = "" + i;
     
@@ -78,6 +81,8 @@ void setup(){
     
     
     PIDTextfields.add(field);
+    
+    setupCommandHandlers();
   }
 
   timeTextlabel = makeTextlabel(panel, "__TimeTextlabel", 15, timesY + 5, "Times");
@@ -98,14 +103,7 @@ void setup(){
 }
 
 void draw(){
-  if (sam == null || !sam.active()) {
-    if (frameCount % 120 == 0) {
-      sam = new Client(this, IP, PORT);
-      if (sam != null && sam.active()) {
-        sam.write("hi\n");
-      }
-    }
-  }
+  keep(sam);
   
   background(255);
   fill(0);
@@ -125,5 +123,9 @@ void draw(){
   plot.getLayer(REFERENCE).drawLines();
   plot.endDraw();
   
+  clearTextfield(timeTextfields, timeFocuses);
+  clearTexfield(speedTextfields, speedFocuses);
+  clearTextfield(PIDTextfields, PIDFocuses);
+  read(sam);
   updateReferenceData(plot, timeTextfields, speedTextfields);
 }
