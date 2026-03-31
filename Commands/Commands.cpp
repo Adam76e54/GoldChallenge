@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "Commands.h"
 #include "GlobalObjects.h"
+#include <Arduino_FreeRTOS.h>
 
 namespace comm{
 
@@ -9,8 +10,8 @@ namespace comm{
   void initialiseHandlerTable(){
     handlerTable[static_cast<uint8_t>(comm::STOP_TOGGLE)] = &handleStopToggle;
 
-    for(char c = '0'; c <= '9'; ++c){
-      handlerTable[c] = &handleArrays;
+    for(unsigned char c = '0'; c <= '9'; ++c){
+      handlerTable[static_cast<uint8_t>(c)] = &handleArrays;
     }
 
   }
@@ -20,7 +21,7 @@ namespace comm{
   }
 
   void handleStopToggle(Command& stop){
-    if(xSemaphoreTake(stoppedSemaphore, pdMS_TO_TICKS(50))){
+    if(xSemaphoreTake(stoppedSemaphore, pdMS_TO_TICKS(50)) == pdTRUE){
       // Read in as a number since the GUI sends 0/1 not true/false
       uint8_t value = atoi(stop.payload);
       // Convert nicely to bool 
@@ -37,19 +38,54 @@ namespace comm{
     unsigned char name = cmd.name;
     uint8_t value = atoi(cmd.payload);
 
-    for(uint8_t i = 0; i < comm::ARRAY_SIZE; ++i){
-      if(name == comm::TIMES[i]){
-        data.targetTimes[i] = value;
-        break;
+    if(xSemaphoreTake(arraySemaphore, pdMS_TO_TICKS(50)) == pdTRUE){
+
+      // Linear search for a matching name
+      for(uint8_t i = 0; i < comm::ARRAY_SIZE; ++i){
+        if(name == comm::TIMES[i]){
+          data.targetTimes[i] = value;
+          data.changed = true;
+          break;
+        }
+
+        if(name == comm::SPEEDS[i]){
+          data.targetSpeeds[i] = value;
+          data.changed = true;
+          break;
+        }
       }
 
-      if(name == comm::SPEEDS[i]){
-        data.targetSpeeds[i] = value;
-        break;
-      }
+      xSemaphoreGive(arraySemaphore);
     }
+
   }
 
+  void handleThresholds(Command& cmd){
+    if(xSemaphoreTake(thresholdSemaphore, pdMS_TO_TICKS(50)) == pdTRUE){
 
+      constexpr uint16_t MAX = 1023;
+      switch (cmd.name) {
+        case comm::LEFT_IR:
+          thresholds.left = MAX * atof(cmd.payload);
+        break;
+        
+        case comm::RIGHT_IR:
+          thresholds.right = MAX * atof(cmd.payload);
+        break;
+      }
+
+      xSemaphoreGive(thresholdSemaphore);
+    }
+
+  }
+
+  void handleTurningFactor(Command& cmd){
+    if(xSemaphoreTake(angleSemaphore, pdMS_TO_TICKS(5)) == pdTRUE){
+
+      angleCoefficients.kp = atof(cmd.payload);
+      
+      xSemaphoreGive(angleSemaphore);
+    }
+  }
 }
 

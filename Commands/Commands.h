@@ -1,7 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
+#include <Arduino_FreeRTOS.h>
 #include "GlobalObjects.h"
+
 struct Command {
   const unsigned char name;
   const char* payload;
@@ -27,6 +29,8 @@ namespace comm
   constexpr unsigned char CURRENT_SPEED = 'H';
   constexpr unsigned char SAVE_EEPROM = 'I';
 
+  constexpr unsigned char TURNING_FACTOR = 'K';
+
   constexpr uint8_t ARRAY_SIZE = 5;
   constexpr unsigned char TIMES[] = {'0', '1', '2', '3', '4'};
   constexpr unsigned char SPEEDS[] = {'5', '6', '7', '8', '9'};
@@ -40,6 +44,10 @@ namespace comm
   void handleStopToggle(Command& stop);
 
   void handleArrays(Command& cmd);
+
+  void handleThresholds(Command& cmd);
+
+  void handleTurningFactor(Command& cmd);
 }
 
 
