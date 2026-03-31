@@ -74,7 +74,7 @@ void move(void*){
 }
 
 void forward(L293D& driver, HCSR04& ears, 
-             uint8_t targetSpeed[], uint8_t targetTime[], uint8_t actualSpeed[], uint8_t actualTimes[]){
+             uint8_t targetSpeeds[], uint8_t targetTimes[], uint8_t actualSpeed[], uint8_t actualTimes[]){
   // Set up controllers
   Controller rightSpeedController(0,0,0), leftSpeedController(0,0,0);
   access(speedPIDSemaphore, pdMS_TO_TICKS(50), 
@@ -89,11 +89,14 @@ void forward(L293D& driver, HCSR04& ears,
 
   constexpr uint8_t MAX_CMS = 50; // For initial guess at speeds
 
-  unsigned int currentTargetSpeed = targetSpeed[0];
-  float left = currentTargetSpeed / (float) MAX_CMS;
-  float right = currentTargetSpeed / (float) MAX_CMS;
+  uint8_t idx = 0;
+  
+  unsigned int currentTargetSpeed = targetSpeeds[idx];
+  unsigned int changeTime = targetTimes[idx];
 
-  unsigned int changeTime = targetTime[1];
+  float leftPercentage = currentTargetSpeed / (float) MAX_CMS;
+  float rightPercentage = currentTargetSpeed / (float) MAX_CMS;
+
 
   constexpr unsigned long MAX_TIME = 60 * 1e6;
   constexpr unsigned long SAMPLE_RATE = 1 * 1e6;
@@ -105,14 +108,27 @@ void forward(L293D& driver, HCSR04& ears,
   float leftMeasurement_cms = 0, rightMeasurement_cms = 0;
   uint8_t idx = 0;
   bool stopped = false;
-  while(timeSince_us(start) < MAX_TIME  && !stopped){
+  
+  bool timeout = false;
+  while(!timeout && !stopped){
+
+    auto currentTime = timeSince_us(start);
+    if(currentTime >= MAX_TIME){
+      timeout = true;
+    }
+
+    if(currentTime > changeTime && idx < data.ARRAY_SIZE){
+      ++idx;
+      changeTime = targetTimes[idx];
+      currentTargetSpeed = targetSpeeds[idx];
+    }
 
     // Fetch if stopped
     access(stoppedSemaphore, pdMS_TO_TICKS(5), [&stopped](){stopped = state.stopped;});
 
 
     if(safe(ears)){
-      driver.forward(left, right);
+      driver.forward(leftPercentage, rightPercentage);
 
       // - MEASURE SPEEDS -
       if(auto interval = timeSince_us(lastSample); interval >= SAMPLE_RATE){
@@ -132,10 +148,6 @@ void forward(L293D& driver, HCSR04& ears,
                                * CIRCUMFERENCE / rightEncoder.COUNTS_PER_REV_;
 
         lastSample += interval;
-
-        if(interval >= changeTime){
-
-        }
       }
 
       // - ANGULAR VELOCITY AND TARGET SPEEDS COMPUTATION - 
@@ -177,10 +189,10 @@ void forward(L293D& driver, HCSR04& ears,
       float leftAdjustment = leftSpeedController.PID(leftError);
       float rightAdjustement = rightSpeedController.PID(rightError);
 
-      left += leftAdjustment;
-      right += rightAdjustement;
+      leftPercentage += leftAdjustment;
+      rightPercentage += rightAdjustement;
 
-      driver.forward(left, right);
+      driver.forward(leftPercentage, rightPercentage);
 
     } else {
       driver.brake(L293D_BRAKE_TIME);
