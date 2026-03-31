@@ -4,13 +4,34 @@
 #include <Arduino_FreeRTOS.h>
 // - RTOS OBJECTS -
 extern QueueHandle_t commandQueue;
-extern SemaphoreHandle_t sensorSemaphore, 
-                         PIDSemaphore, 
+extern SemaphoreHandle_t irSemaphore, 
+                         speedPIDSemaphore, 
                          arraySemaphore,
-                         stoppedSemaphore;
-extern TaskHandle_t moveTaskHandle;
-// - STRUCS -
+                         stoppedSemaphore,
+                         thresholdSemaphore,
+                         angleSemaphore;
+
+void initialiseSemaphores();
+
+// Repeatable function for accessing data under the protection of a semaphore
+template <typename Function>
+bool access(SemaphoreHandle_t semaphore, TickType_t time , Function&& function){
+  if(xSemaphoreTake(semaphore, time) == pdTRUE){
+    function();
+    xSemaphoreGive(semaphore);
+    return true;
+  }
+
+  return false;
+}
+
+// - STRUCTS -
 struct Sensors{
+  uint16_t left = 0;
+  uint16_t right = 0;
+};
+
+struct Thresholds{
   uint16_t left = 0;
   uint16_t right = 0;
 };
@@ -29,14 +50,17 @@ struct PIDCoefficients {
 };
 
 struct Arrays{
+  bool changed = false;
+
   // Time and speed arrays
   static constexpr uint8_t ARRAY_SIZE = 5;
-  unsigned int targetTimes[ARRAY_SIZE];
-  unsigned int targetSpeeds[ARRAY_SIZE];
+  unsigned int targetTimes[ARRAY_SIZE] = {0};
+  unsigned int targetSpeeds[ARRAY_SIZE] = {0};
 
-  unsigned int actualTimes[ARRAY_SIZE];
-  unsigned int actualSpeeds[ARRAY_SIZE];
-} ;
+  static constexpr uint8_t MEASURING_ARRAY_SIZE = 60; 
+  unsigned int actualTimes[MEASURING_ARRAY_SIZE] = {0};
+  unsigned int actualSpeeds[MEASURING_ARRAY_SIZE] = {0};
+};
 
 // EEPROM addresses
 constexpr unsigned int LEFT_PERCENTAGE_ADDRESS = 0;
@@ -49,8 +73,12 @@ struct DriverState{
   bool stopped = true;
 } ;
 
+
+
 extern Sensors sensors;
+extern Thresholds thresholds;
 extern SpeedPercentages speedPercentage;
-extern PIDCoefficients speedMatching;
+extern PIDCoefficients speedCoefficients, angleCoefficients;
 extern Arrays data;
 extern DriverState state;
+
