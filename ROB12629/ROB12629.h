@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <Arduino_FreeRTOS.h>
 
 class ROB12629{
   private:
