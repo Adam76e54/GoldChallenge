@@ -10,7 +10,7 @@ class Controller {
 
     bool first;
 
-    const float kp, ki, kd;
+    float kp, ki, kd;
 
   public:
 
@@ -56,4 +56,9 @@ class Controller {
     first = true;
   }
 
+  void set(float kp, float ki, float kd){
+    this->kp = kp;
+    this->ki = ki;
+    this->kd = kd;
+  }
 };
