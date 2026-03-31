@@ -15,13 +15,18 @@ void irSensing(void*){
   while(true){
     xTaskDelayUntil(&lastWakeTime, period);
 
-    // Serial.println("Sensed");
-    sensors.left = left.read();
-    sensors.right = right.read();
 
-    if(moveTaskHandle != nullptr){
-      xTaskNotifyGive(moveTaskHandle);
+    if(xSemaphoreTake(irSemaphore, pdMS_TO_TICKS(5)) == pdTRUE){
+      // Serial.println("Sensed");
+      sensors.left = left.read();
+      sensors.right = right.read();
+
+      // Serial.print("Left = "); Serial.println(sensors.left);
+      // Serial.print("Right = "); Serial.println(sensors.right);
+
+      xSemaphoreGive(irSemaphore);
     }
+    
 
   }
 }

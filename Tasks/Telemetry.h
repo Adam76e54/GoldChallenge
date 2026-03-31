@@ -11,7 +11,7 @@
 
 constexpr uint8_t N = 128;
 
-void sendBack(const unsigned char comm, const char* value);
+void sendBack(WiFiClient GUI, const unsigned char comm, float value);
 void keep(WiFiClient& GUI, WiFiServer& server);
 
 template <uint8_t N> 
@@ -46,6 +46,22 @@ void telemetry(void*){
     read(GUI, in);
 
     handle(in);
+
+    // Send back IR sensor data
+    static uint16_t leftIR = 0, rightIR = 0;
+    if(xSemaphoreTake(irSemaphore, pdMS_TO_TICKS(50)) == pdTRUE){
+
+      leftIR = sensors.left;
+      rightIR = sensors.right;
+
+      xSemaphoreGive(irSemaphore);
+
+      sendBack(GUI, comm::LEFT_IR, leftIR);
+      sendBack(GUI, comm::RIGHT_IR, rightIR);
+    }
+
+
+
   }
 }
 
@@ -57,8 +73,8 @@ void keep(WiFiClient& GUI, WiFiServer& server){
   }
 }
 
-void sendBack(WiFiClient GUI, const unsigned char comm, const char* value){
-  GUI.print(comm); GUI.print(comm::DELIMITER); GUI.println(value);
+void sendBack(WiFiClient GUI, const unsigned char comm, float value){
+  GUI.print(static_cast<char>(comm)); GUI.print(comm::DELIMITER); GUI.println(value);
 }
 
 //read command into buffer
@@ -74,11 +90,12 @@ bool read(WiFiClient& GUI, Buffer<N>& buffer){
   return false;
 }
 
+// Handle commands loaded into buffer
 template <uint8_t N>
 void handle(Buffer<N>& buffer){
 
   if(buffer.available() > 0){
-    constexpr unsigned int WAIT_TIME = 100;
+    // constexpr unsigned int WAIT_TIME = 100;
 
     char message [N];
 
@@ -92,7 +109,7 @@ void handle(Buffer<N>& buffer){
     // Get a value if it exists (we take a pointer to the rest of the string)
     const char* value = (messageSize > 2) ? &message[2] : nullptr;
 
-    // Serial.print("Function = "); Serial.println(function);
+    // Serial.print("Function = "); Serial.println(name);
     // Serial.print("Value = "); Serial.println(value);
     // Initialise a command to be sent
     Command command {
