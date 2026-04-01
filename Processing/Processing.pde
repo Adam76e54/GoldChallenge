@@ -10,7 +10,12 @@ void setup(){
   rectMode(CENTER);
   
   //connect to sam
-  if(sam != null) setupClient(sam);
+  if(sam != null) {
+    sam = new Client(this, IP, PORT);
+    if(sam.active()){
+      sam.write("Connected");//this is actually essential. WiFiServer::available() only pulls in client who have data waiting so we need to write something to be seen
+    } 
+  }
   
   panel = new ControlP5(this);
   
@@ -103,7 +108,14 @@ void setup(){
 }
 
 void draw(){
-  keep(sam);
+  if (sam == null || !sam.active()) {
+    if (frameCount % 120 == 0) {
+      sam = new Client(this, IP, PORT);
+      if (sam != null && sam.active()) {
+        sam.write("hi\n");
+      }
+    }
+  }
   
   background(255);
   fill(0);
@@ -124,7 +136,7 @@ void draw(){
   plot.endDraw();
   
   clearTextfield(timeTextfields, timeFocuses);
-  clearTexfield(speedTextfields, speedFocuses);
+  clearTextfield(speedTextfields, speedFocuses);
   clearTextfield(PIDTextfields, PIDFocuses);
   read(sam);
   updateReferenceData(plot, timeTextfields, speedTextfields);

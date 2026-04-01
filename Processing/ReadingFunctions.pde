@@ -9,7 +9,7 @@ void read(Client sam) {
   String line = sam.readStringUntil('\n');
   if (line == null) return;
 
-  print(line);
+  //print(line);
   line = trim(line);
 
   int firstColon = line.indexOf(':');
