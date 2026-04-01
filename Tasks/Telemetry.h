@@ -40,19 +40,18 @@ void telemetry(void*){
 
     keep(GUI, server);
 
-    // Serial.println("Inside telemetry");
-    // Serial.println(GUI.available());
+    // Serial.print("Inside telemetry; Available bytes = "); Serial.println(GUI.available());
 
     read(GUI, in);
 
     handle(in);
 
     // Send back IR sensor data
-    static uint16_t leftIR = 0, rightIR = 0;
+    static float leftIR = 0, rightIR = 0;
     if(xSemaphoreTake(irSemaphore, pdMS_TO_TICKS(50)) == pdTRUE){
 
-      leftIR = sensors.left;
-      rightIR = sensors.right;
+      leftIR = (sensors.left / 1023.0f) * 100.0f ;
+      rightIR = (sensors.right / 1023.0f) * 100.0f;
 
       xSemaphoreGive(irSemaphore);
 
@@ -74,7 +73,9 @@ void keep(WiFiClient& GUI, WiFiServer& server){
 }
 
 void sendBack(WiFiClient GUI, const unsigned char comm, float value){
-  GUI.print(static_cast<char>(comm)); GUI.print(comm::DELIMITER); GUI.println(value);
+  GUI.print(static_cast<char>(comm)); GUI.print(static_cast<char>(comm::DELIMITER)); GUI.println(value);
+  // Serial.print(static_cast<char>(comm)); Serial.print(static_cast<char>(comm::DELIMITER)); Serial.println(value);
+  
 }
 
 //read command into buffer
