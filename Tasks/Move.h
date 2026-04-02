@@ -11,7 +11,7 @@
 #include "ISR.h"
 
 void forward(L293D& driver, HCSR04& ears, 
-             uint8_t targetSpeed[], uint8_t targetTime[], uint8_t actualSpeed[], uint8_t actualTimes[]);
+             uint8_t targetSpeed[], uint8_t targetTime[]);
         
 bool safe(HCSR04 &ears);
 unsigned long timeSince_us(unsigned long start);
@@ -30,7 +30,6 @@ void decide(void*){
 
   // Local copies of data.arrays
   uint8_t targetSpeeds[data.ARRAY_SIZE], targetTimes[data.ARRAY_SIZE];
-  uint8_t actualSpeeds[data.MEASURING_ARRAY_SIZE], actualTimes[data.MEASURING_ARRAY_SIZE];
 
   // How long to wait for Semaphores
   constexpr uint16_t WAIT_TIME_MS = 50;
@@ -39,9 +38,6 @@ void decide(void*){
   while(true){
     xTaskDelayUntil(&lastWakeTime, period);
 
-
-    // Serial.println("Inside move task");
-    
     // Make non volatile local copies of the data, just for clarity
     uint16_t left = sensors.left;
     uint16_t right = sensors.right;
@@ -67,7 +63,7 @@ void decide(void*){
     access(stoppedSemaphore, pdMS_TO_TICKS(5), [&stopped](){stopped = state.stopped;});
 
     if(!stopped){
-      forward(driver, ears, targetSpeeds, targetSpeeds, actualSpeeds, actualTimes);
+      forward(driver, ears, targetSpeeds, targetTimes);
     } else {
       driver.brake(L293D_BRAKE_TIME);
     }
@@ -76,7 +72,7 @@ void decide(void*){
 }
 
 void forward(L293D& driver, HCSR04& ears, 
-             uint8_t targetSpeeds[], uint8_t targetTimes[], uint8_t actualSpeed[], uint8_t actualTimes[]){
+             uint8_t targetSpeeds[], uint8_t targetTimes[]){
 
   constexpr TickType_t period = pdMS_TO_TICKS(5);
   TickType_t lastWakeTime = xTaskGetTickCount();
@@ -87,27 +83,26 @@ void forward(L293D& driver, HCSR04& ears,
     [&rightSpeedController, &leftSpeedController](){
       rightSpeedController.set(speedCoefficients.kp, speedCoefficients.ki, speedCoefficients.kd);
       leftSpeedController.set(speedCoefficients.kp, speedCoefficients.ki, speedCoefficients.kd);
-
-      Serial.print("Left and right kp = "); Serial.println(speedCoefficients.kp);
+      // Serial.print("Left and right kp = "); Serial.println(speedCoefficients.kp);
     }
   );
-
 
   // Reset counts
   leftEncoder.reset(); rightEncoder.reset();
 
   constexpr uint8_t MAX_CMS = 40; // For initial guess at speeds
 
-  uint8_t idx = 0;
-  uint16_t currentTargetSpeed = targetSpeeds[idx];
-  unsigned long changeTime_us = (unsigned long)targetTimes[idx] * 1e6;
+  uint8_t targetsIdx = 0, actualsIdx = 0;
+  uint16_t currentTargetSpeed = targetSpeeds[targetsIdx];
+  Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
+  unsigned long currentChangeTime_us = (unsigned long)targetTimes[targetsIdx] * 1e6;
+  Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
 
   float leftPercentage = currentTargetSpeed / (float) MAX_CMS;
   float rightPercentage = currentTargetSpeed / (float) MAX_CMS;
 
-
-  constexpr unsigned long MAX_TIME = 60UL * 1e6UL;
-  constexpr unsigned long SAMPLE_RATE = 1 * 1e6;
+  constexpr unsigned long MAX_TIME_us = 60 * 1e6;
+  constexpr unsigned long SAMPLE_RATE_us = 1 * 1e6;
   const auto start = micros();
 
   auto lastSample = start;
@@ -119,19 +114,27 @@ void forward(L293D& driver, HCSR04& ears,
   bool timeout = false;
   while(!timeout && !stopped){
     // Block periodically, this is a bit janky but i'd need a big refactor if I want it smoother.
-    vTaskDelayUntil(&lastWakeTime, period);
+    vTaskDelay(2);
 
-    Serial.println("Going forward:");
+    // Serial.println("Going forward:");
 
     auto currentTime_us = timeSince_us(start);
-    if(currentTime_us >= MAX_TIME){
+    // Serial.print("Current time = "); Serial.println(currentTime_us);
+    if(currentTime_us >= MAX_TIME_us){
+      Serial.println("Timed out");
       timeout = true;
     }
 
-    if(currentTime_us >= changeTime_us && (idx + 1) < data.ARRAY_SIZE){
-      ++idx;
-      changeTime_us += (unsigned long)targetTimes[idx] * 1e6;
-      currentTargetSpeed = targetSpeeds[idx];
+    if(currentTime_us >= currentChangeTime_us && (targetsIdx + 1) < data.ARRAY_SIZE){
+      ++targetsIdx;
+      // Serial.print("Idx = "); Serial.println(idx);
+      currentChangeTime_us += (unsigned long)targetTimes[targetsIdx] * 1e6;
+      currentTargetSpeed = targetSpeeds[targetsIdx];
+    
+      Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
+      Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
+
+
     }
 
     // Fetch if stopped
@@ -139,15 +142,17 @@ void forward(L293D& driver, HCSR04& ears,
 
 
     if(safe(ears)){
-      Serial.println("Safe");
-      Serial.print("Left and right speeds = "); Serial.print(leftPercentage);
+      // Serial.println("Safe");
+      Serial.print("Left and right percentages = "); Serial.print(leftPercentage);
       Serial.print(", ");Serial.println(rightPercentage);
 
       driver.forward(leftPercentage, rightPercentage);
 
-      // - MEASURE SPEEDS -
-      if(auto interval = timeSince_us(lastSample); interval >= SAMPLE_RATE){
+      if(auto interval = timeSince_us(lastSample); interval >= SAMPLE_RATE_us){
         //  - MEAURE SPEEDS -
+
+        // Note we could make the tighter by having task notifcation 
+        // from the ISRs so we measure the exact time between counts
         auto leftCount = leftEncoder.count();
         auto rightCount = rightEncoder.count();
 
@@ -162,6 +167,16 @@ void forward(L293D& driver, HCSR04& ears,
         rightMeasurement_cms = (rightChange / static_cast<float>(interval * 1e-6)) 
                                * CIRCUMFERENCE / rightEncoder.COUNTS_PER_REV_;
 
+        // Notify telemetry to send data.
+        float velocity = (leftMeasurement_cms + rightMeasurement_cms) / 2.0f;
+        access(arraySemaphore, pdMS_TO_TICKS(5), [](){
+          data.currentActualSpeed = velocity;
+          data.currentActualTime = currentTime_us;
+        });
+        xTaskNotify(telemetryTaskHandle, actualsIdx, eSetValueWithoutOverwrite);
+        ++actualsIdx;
+
+
         lastSample += interval;
         lastLeftCount = leftCount;
         lastRightCount = rightCount;
@@ -169,7 +184,6 @@ void forward(L293D& driver, HCSR04& ears,
 
       // - ANGULAR VELOCITY AND TARGET SPEEDS COMPUTATION - 
       constexpr float AXLE = 14.0f;
-      float velocity = (leftMeasurement_cms + rightMeasurement_cms) / 2.0f;
 
       static uint16_t leftThreshold = 0, rightThreshold = 0;
       access(thresholdSemaphore, pdMS_TO_TICKS(5), [](){
@@ -200,8 +214,9 @@ void forward(L293D& driver, HCSR04& ears,
       float targetRightSpeed = currentTargetSpeed + (targetAngularVelocity * AXLE / 2.0f);
 
       // - PID ADJUSTMENT -
-      float leftError = (targetLeftSpeed - leftMeasurement_cms) / MAX_CMS;
-      float rightError = (targetRightSpeed - rightMeasurement_cms) / MAX_CMS;
+      constexpr float SCALAR = 0.0001; // This is just to make the PID numbers bigger
+      float leftError = (targetLeftSpeed - leftMeasurement_cms) * SCALAR;
+      float rightError = (targetRightSpeed - rightMeasurement_cms) * SCALAR;
       Serial.print("Left and right errors = "); Serial.print(leftError);
       Serial.print(", ");Serial.println(rightError);
 
@@ -214,7 +229,7 @@ void forward(L293D& driver, HCSR04& ears,
       rightPercentage += rightAdjustement;
 
     } else {
-      Serial.println("Unsafe");
+      // Serial.println("Unsafe");
       driver.brake(L293D_BRAKE_TIME);
       break;
     }
@@ -222,6 +237,9 @@ void forward(L293D& driver, HCSR04& ears,
 
   }
 
+  access(stoppedSemaphore, pdMS_TO_TICKS(50), [](){
+    state.stopped = true;
+  });
 
 }
 

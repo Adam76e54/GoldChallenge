@@ -59,6 +59,21 @@ void telemetry(void*){
       sendBack(GUI, comm::RIGHT_IR, rightIR);
     }
 
+    // Send actual speeds and times
+    uint32_t idx;
+    uint16_t time = 0, speed = 0;
+
+    if(xTaskNotifyWait(0, 0xFFFFFFFF, &idx, pdMS_TO_TICKS(50))){
+      access(arraySemaphore, pdMS_TO_TICKS(5), [idx](){
+        times = data.actualTimes[idx];
+        speeds = data.actualSpeeds[idx];
+      });
+
+      char delimiter = static_cast<char>(comm::DELIMITER);
+      GUI.print(static_cast<char>(comm::ACTUAL_SPEED)); GUI.print(delimiter);
+      GUI.print(idx); GUI.print(delimiter) ; GUI.println()
+    }
+
 
 
   }
