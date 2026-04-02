@@ -25,6 +25,10 @@ void setup(){
   plot.getLayer(REFERENCE).setLineColor(color(0, 114, 189));
   plot.getLayer(REFERENCE).setLineWidth(2);
   
+  plot.addLayer(ACTUAL, new GPointsArray());
+  plot.getLayer(ACTUAL).setLineColor(color(0));
+  plot.getLayer(ACTUAL).setLineWidth(2);
+  
   plot.setXLim(0, 60);
   plot.setYLim(0, 50);
   

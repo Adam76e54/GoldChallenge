@@ -18,6 +18,9 @@ final char comm_SAVE_EEPROM = 'I';
  final char comm_LEFT_IR_IN = 'J';
 
 final char comm_TURNING_FACTOR = 'K';
+
+final char comm_ACTUAL_TIME = 'L';
+final char comm_ACTUAL_SPEED = 'M';
   
 final ArrayList<Character> comm_TIMES = new ArrayList<Character>(
   Arrays.asList('0', '1', '2', '3', '4')

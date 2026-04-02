@@ -42,7 +42,10 @@ GPlot plot;
 GPointsArray points;
 
 final String REFERENCE = "Reference";
+final String ACTUAL = "Actual";
 
+ArrayList<Float> actualTimes = new ArrayList<Float>();
+ArrayList<Float> actualSpeeds = new ArrayList<Float>();
 
 ArrayList<Float> lastTimes  = new ArrayList<Float>();
 ArrayList<Float> lastSpeeds = new ArrayList<Float>();

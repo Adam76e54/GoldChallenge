@@ -47,4 +47,46 @@ void setupCommandHandlers(){
     }
   });
   
+  handlers.put(comm_ACTUAL_TIME, new CommandHandler(){
+    public void handle(String payload){
+      
+      int colon = payload.indexOf(':');
+      if (colon <= 0 || colon >= payload.length() - 1) return;
+      
+      String strIdx = payload.substring(0, colon);
+      String strValue = payload.substring(colon + 1);
+      
+      int idx = parseInt(strIdx);
+      float value = parseFloat(strValue);
+      
+      if(idx < actualTimes.size()){
+        actualTimes.set(idx, value); 
+      } else {
+        actualTimes.add(value); 
+      }
+      
+    }
+  });
+  
+  handlers.put(comm_ACTUAL_SPEED, new CommandHandler(){
+    public void handle(String payload){
+
+      int colon = payload.indexOf(':');
+      if (colon <= 0 || colon >= payload.length() - 1) return;
+      
+      String strIdx = payload.substring(0, colon);
+      String strValue = payload.substring(colon + 1);
+      
+      int idx = parseInt(strIdx);
+      float value = parseFloat(strValue);
+      
+      if(idx < actualTimes.size()){
+        actualSpeeds.set(idx, value); 
+      } else {
+        actualSpeeds.add(value); 
+      }
+      
+    }
+  });
+  
 }
