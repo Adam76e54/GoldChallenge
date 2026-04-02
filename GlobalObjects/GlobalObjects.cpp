@@ -9,6 +9,7 @@ SemaphoreHandle_t irSemaphore,
                   stoppedSemaphore,
                   thresholdSemaphore, 
                   angleSemaphore;
+TaskHandle_t telemetryTaskHandle;
 
 Sensors sensors;
 Thresholds thresholds;
