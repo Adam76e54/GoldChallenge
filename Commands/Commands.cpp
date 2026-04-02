@@ -14,10 +14,14 @@ namespace comm{
       handlerTable[static_cast<uint8_t>(c)] = &handleArrays;
     }
 
+    handlerTable[static_cast<uint8_t>(comm::KP)] = &handleCoefficients;
+    handlerTable[static_cast<uint8_t>(comm::KI)] = &handleCoefficients;
+    handlerTable[static_cast<uint8_t>(comm::KD)] = &handleCoefficients;
+
   }
 
   void print(Command&){
-    Serial.println("That worked");
+    // Serial.println("That worked");
   }
 
   void handleStopToggle(Command& stop){
@@ -27,7 +31,7 @@ namespace comm{
       // Convert nicely to bool 
       state.stopped = (value != 0);
 
-      Serial.print("Recieved p = "); Serial.println(value);
+      // Serial.print("Recieved p = "); Serial.println(value);
       // Serial.print("Changed stopped to "); Serial.println(state.stopped ? "true" : "false");
 
       xSemaphoreGive(stoppedSemaphore);
@@ -86,6 +90,30 @@ namespace comm{
       
       xSemaphoreGive(angleSemaphore);
     }
+  }
+
+  void handleCoefficients(Command& cmd){
+    unsigned char name = cmd.name;
+    float value = atof(cmd.payload);
+
+    // Serial.println("Entered handling coefficients");
+
+    access(speedPIDSemaphore, pdMS_TO_TICKS(5), [name, value](){
+      switch(name){
+        case comm::KP:
+          speedCoefficients.kp = value;
+          // Serial.print("Adjusted kp to = "); Serial.println(speedCoefficients.kp);
+        break;
+
+        case comm::KI:
+          speedCoefficients.ki = value;
+        break;
+
+        case comm::KD:
+          speedCoefficients.kd = value;
+        break;
+      }
+    });
   }
 }
 
