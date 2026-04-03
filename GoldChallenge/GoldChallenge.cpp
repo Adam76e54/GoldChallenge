@@ -1,6 +1,5 @@
 #include "Buggy.h"
 
-ROB12629 leftEncoder(2), rightEncoder(3);
 
 void setup() {
   Serial.begin(115200);
