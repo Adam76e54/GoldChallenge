@@ -75,7 +75,7 @@ void forward(L293D& driver, HCSR04& ears,
   // constexpr TickType_t period = pdMS_TO_TICKS(5);
   // TickType_t lastWakeTime = xTaskGetTickCount();
 
-  // Set up controllers
+  // Set up controllers, turning factor, IR thresholds
   Controller rightSpeedController(0,0,0), leftSpeedController(0,0,0);
   access(speedPIDSemaphore, pdMS_TO_TICKS(50), 
     [&rightSpeedController, &leftSpeedController](){
@@ -84,18 +84,23 @@ void forward(L293D& driver, HCSR04& ears,
       // Serial.print("Left and right kp = "); Serial.println(speedCoefficients.kp);
     }
   );
-
   float angleKp = 0;
   access(angleSemaphore, pdMS_TO_TICKS(50), [&]{
     angleKp = angleCoefficients.kp;
+  });
+  uint16_t leftThreshold = 0, rightThreshold = 0;
+  access(thresholdSemaphore, pdMS_TO_TICKS(50), [](){
+    leftThreshold = thresholds.left;
+    rightThreshold = thresholds.right;
   });
 
   // Reset counts
   leftEncoder.reset(); rightEncoder.reset();
 
-  constexpr uint8_t MAX_CMS = 40; // For initial guess at speeds
+  constexpr uint8_t MAX_CMS = 50; // For initial guess at speeds
   constexpr float CIRCUMFERENCE = 21.0f;
   constexpr float CM_PER_COUNT = CIRCUMFERENCE / leftEncoder.COUNTS_PER_REV_;
+  // constexpr float AXLE = 13.5f;
 
   uint8_t targetsIdx = 0, actualsIdx = 0;
   uint16_t currentTargetSpeed = targetSpeeds[targetsIdx];
@@ -110,61 +115,51 @@ void forward(L293D& driver, HCSR04& ears,
   constexpr unsigned long SAMPLE_RATE_us = 1 * 1e6;
   const auto start = micros();
 
-  auto lastSample = start;
   unsigned long lastLeftCount = 0, lastRightCount = 0;
 
   float leftMeasurement_cms = 0, rightMeasurement_cms = 0;
-  bool stopped = false;
+
   
   unsigned long rightIrCounter = 0, leftIrCounter = 0;
   unsigned long rightEncoderCounter = 0, leftEncoderCounter = 0;
 
+  bool stopped = false;
+  access(stoppedSemaphore, pdMS_TO_TICKS(50), [&stopped](){stopped = state.stopped;});
   bool timeout = false;
   while(!timeout && !stopped){
     // Block periodically, this is a bit janky but i'd need a big refactor if I want it smoother.
+    // Serial.println("Going forward:");
     vTaskDelay(2);
 
-    // Serial.println("Going forward:");
-
+    // 1. Update loop conditions
+    access(stoppedSemaphore, pdMS_TO_TICKS(5), [&stopped](){stopped = state.stopped;});
     auto currentTime_us = timeSince_us(start);
-    // Serial.print("Current time = "); Serial.println(currentTime_us);
-    // if(currentTime_us >= MAX_TIME_us){
-    //   Serial.println("Timed out");
-    //   timeout = true;
-    // }
+    if(currentTime_us >= MAX_TIME_us){
+      // Serial.println("Timed out");
+      timeout = true;
+    }
 
-    // 1. Update targets
+    // 2. Update target speeds and times
     if(currentTime_us >= currentChangeTime_us && (targetsIdx + 1) < data.ARRAY_SIZE){
       ++targetsIdx;
       // Serial.print("Idx = "); Serial.println(idx);
       currentChangeTime_us += (unsigned long)targetTimes[targetsIdx] * 1e6;
       currentTargetSpeed = targetSpeeds[targetsIdx];
     
-      Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
-      Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
-
-
+      // Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
+      // Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
     }
 
-    // Fetch if stopped
-    access(stoppedSemaphore, pdMS_TO_TICKS(5), [&stopped](){stopped = state.stopped;});
-
     if(safe(ears)){
+      // - RUN FORWARD -
+
       // Serial.println("Safe");
       // Serial.print("Left and right percentages = "); Serial.print(leftPercentage);
       // Serial.print(", ");Serial.println(rightPercentage);
 
       driver.forward(leftPercentage, rightPercentage);
 
-      // - 1. ANGULAR VELOCITY AND TARGET SPEEDS COMPUTATION - 
-      constexpr float AXLE = 14.0f;
-
-      static uint16_t leftThreshold = 0, rightThreshold = 0;
-      access(thresholdSemaphore, pdMS_TO_TICKS(5), [](){
-        leftThreshold = thresholds.left;
-        rightThreshold = thresholds.right;
-      });
-
+      // 1. FOLLOW LINE
       bool leftOnLine = false, rightOnLine = false;
       access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine]() {
         leftOnLine = sensors.left < leftThreshold ;
@@ -179,6 +174,8 @@ void forward(L293D& driver, HCSR04& ears,
       float targetLeftSpeed = currentTargetSpeed, targetRightSpeed = currentTargetSpeed;
 
       if(rightOnLine){
+        targetLeftSpeed +=  * angleKp;
+        targetRightSpeed -= currentTargetSpeed * angleKp;
       } 
 
       if(leftOnLine){
@@ -189,7 +186,7 @@ void forward(L293D& driver, HCSR04& ears,
       Serial.print("Left target speed = "); Serial.println(targetLeftSpeed);
       Serial.print("Right target speed = "); Serial.println(targetRightSpeed);
 
-      // - 2. PID ADJUSTMENT -
+      // - 2. MEAUSURE SPEED -> PID ADJUSTMENT -
       leftEncoderCounter = leftEncoder.count();
       rightEncoderCounter = rightEncoder.count();
       
