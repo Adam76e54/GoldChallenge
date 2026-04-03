@@ -119,6 +119,7 @@ void forward(L293D& driver, HCSR04& ears,
 
   float leftMeasurement_cms = 0, rightMeasurement_cms = 0;
 
+  unsigned long lastSample = micros();
   
   unsigned long rightIrCounter = 0, leftIrCounter = 0;
   unsigned long rightEncoderCounter = 0, leftEncoderCounter = 0;
@@ -214,6 +215,20 @@ void forward(L293D& driver, HCSR04& ears,
         float error = (targetRightSpeed - rightMeasurement_cms) * SCALAR;
         float rightAdustment = rightSpeedController.PID(error);
         rightPercentage += rightAdustment;
+      }
+
+
+      if(auto interval = timeSince_us(lastSample); interval >= SAMPLE_RATE_us){
+        // Notify telemetry to send data.
+        float velocity = (leftMeasurement_cms + rightMeasurement_cms) / 2.0f;
+        access(arraySemaphore, pdMS_TO_TICKS(5), [](){
+          data.currentActualSpeed = velocity;
+          data.currentActualTime = currentTime_us;
+        });
+        xTaskNotify(telemetryTaskHandle, actualsIdx, eSetValueWithoutOverwrite);
+        ++actualsIdx;
+
+        lastSample += interval;
       }
 
     } else {
