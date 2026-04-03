@@ -8,7 +8,11 @@
 #include "L293D.h"
 #include "HCSR04.h"
 #include "GlobalObjects.h"
+#include "ROB12629.h"
 #include "ISR.h"
+
+
+ROB12629 leftEncoder(2), rightEncoder(3);
 
 void forward(L293D& driver, HCSR04& ears, 
              uint8_t targetSpeed[], uint8_t targetTime[]);
@@ -81,10 +85,17 @@ void forward(L293D& driver, HCSR04& ears,
     }
   );
 
+  float angleKp = 0;
+  access(angleSemaphore, pdMS_TO_TICKS(50), [&]{
+    angleKp = angleCoefficients.kp;
+  });
+
   // Reset counts
   leftEncoder.reset(); rightEncoder.reset();
 
   constexpr uint8_t MAX_CMS = 40; // For initial guess at speeds
+  constexpr float CIRCUMFERENCE = 21.0f;
+  constexpr float CM_PER_COUNT = CIRCUMFERENCE / leftEncoder.COUNTS_PER_REV_;
 
   uint8_t targetsIdx = 0, actualsIdx = 0;
   uint16_t currentTargetSpeed = targetSpeeds[targetsIdx];
@@ -106,6 +117,7 @@ void forward(L293D& driver, HCSR04& ears,
   bool stopped = false;
   
   unsigned long rightIrCounter = 0, leftIrCounter = 0;
+  unsigned long rightEncoderCounter = 0, leftEncoderCounter = 0;
 
   bool timeout = false;
   while(!timeout && !stopped){
@@ -116,11 +128,12 @@ void forward(L293D& driver, HCSR04& ears,
 
     auto currentTime_us = timeSince_us(start);
     // Serial.print("Current time = "); Serial.println(currentTime_us);
-    if(currentTime_us >= MAX_TIME_us){
-      Serial.println("Timed out");
-      timeout = true;
-    }
+    // if(currentTime_us >= MAX_TIME_us){
+    //   Serial.println("Timed out");
+    //   timeout = true;
+    // }
 
+    // 1. Update targets
     if(currentTime_us >= currentChangeTime_us && (targetsIdx + 1) < data.ARRAY_SIZE){
       ++targetsIdx;
       // Serial.print("Idx = "); Serial.println(idx);
@@ -136,7 +149,6 @@ void forward(L293D& driver, HCSR04& ears,
     // Fetch if stopped
     access(stoppedSemaphore, pdMS_TO_TICKS(5), [&stopped](){stopped = state.stopped;});
 
-
     if(safe(ears)){
       // Serial.println("Safe");
       // Serial.print("Left and right percentages = "); Serial.print(leftPercentage);
@@ -144,41 +156,7 @@ void forward(L293D& driver, HCSR04& ears,
 
       driver.forward(leftPercentage, rightPercentage);
 
-      if(auto interval = timeSince_us(lastSample); interval >= SAMPLE_RATE_us){
-        //  - MEAURE SPEEDS -
-
-        // Note we could make the tighter by having task notifcation 
-        // from the ISRs so we measure the exact time between counts
-        auto leftCount = leftEncoder.count();
-        auto rightCount = rightEncoder.count();
-
-        auto leftChange = leftCount - lastLeftCount;
-        auto rightChange = rightCount - lastRightCount;
-
-        constexpr float CIRCUMFERENCE = 21.0f;
-
-        leftMeasurement_cms = (leftChange / static_cast<float>(interval * 1e-6)) 
-                              * CIRCUMFERENCE / leftEncoder.COUNTS_PER_REV_;
-
-        rightMeasurement_cms = (rightChange / static_cast<float>(interval * 1e-6)) 
-                               * CIRCUMFERENCE / rightEncoder.COUNTS_PER_REV_;
-
-        // Notify telemetry to send data.
-        float velocity = (leftMeasurement_cms + rightMeasurement_cms) / 2.0f;
-        access(arraySemaphore, pdMS_TO_TICKS(5), [velocity, currentTime_us](){
-          data.currentActualSpeed = velocity;
-          data.currentActualTime = currentTime_us * 1e-6;
-        });
-        xTaskNotify(telemetryTaskHandle, actualsIdx, eSetValueWithoutOverwrite);
-        ++actualsIdx;
-
-
-        lastSample += interval;
-        lastLeftCount = leftCount;
-        lastRightCount = rightCount;
-      }
-
-      // - ANGULAR VELOCITY AND TARGET SPEEDS COMPUTATION - 
+      // - 1. ANGULAR VELOCITY AND TARGET SPEEDS COMPUTATION - 
       constexpr float AXLE = 14.0f;
 
       static uint16_t leftThreshold = 0, rightThreshold = 0;
@@ -197,49 +175,49 @@ void forward(L293D& driver, HCSR04& ears,
         // Serial.print("Right threshold = "); Serial.println(rightThreshold);
       });
 
-      // Counters for estimating target angular velocity
-      // rightIrCounter = rightOnLine ? rightIrCounter + 1 : 0;
+      // Set left and right target speeds based on angular velocity target
+      float targetLeftSpeed = currentTargetSpeed, targetRightSpeed = currentTargetSpeed;
+
       if(rightOnLine){
-        ++rightIrCounter;
-      } else {
-        rightIrCounter = 0;
+      } 
+
+      if(leftOnLine){
+        targetLeftSpeed -= currentTargetSpeed * angleKp;
+        targetRightSpeed += currentTargetSpeed * angleKp;
       }
 
-      leftIrCounter = leftOnLine ? leftIrCounter + 1 : 0;
-
-      // Serial.print("Left ir counter = "); Serial.println(leftIrCounter);
-      // Serial.print("Right ir counter = "); Serial.println(rightIrCounter);
-      // Adjust targetAngularVelocity
-      float omega = 0; 
-      static float angleKp = 0;
-      access(angleSemaphore, pdMS_TO_TICKS(5), [&]{
-        angleKp = angleCoefficients.kp;
-      });
-
-      omega = (rightIrCounter) * angleKp
-                                - (leftIrCounter) * angleKp;
-      // Set left and right target speeds based on angular velocity target
-      float targetLeftSpeed = currentTargetSpeed - (omega * AXLE / 2.0f);
-      float targetRightSpeed = currentTargetSpeed + (omega * AXLE / 2.0f);
-
-      Serial.print("Omega = "); Serial.println(omega);
       Serial.print("Left target speed = "); Serial.println(targetLeftSpeed);
       Serial.print("Right target speed = "); Serial.println(targetRightSpeed);
 
-      // - PID ADJUSTMENT -
+      // - 2. PID ADJUSTMENT -
+      leftEncoderCounter = leftEncoder.count();
+      rightEncoderCounter = rightEncoder.count();
+      
       constexpr float SCALAR = 0.0001; // This is just to make the PID numbers bigger
-      float leftError = (targetLeftSpeed - leftMeasurement_cms) * SCALAR;
-      float rightError = (targetRightSpeed - rightMeasurement_cms) * SCALAR;
-      // Serial.print("Left and right errors = "); Serial.print(leftError);
-      // Serial.print(", ");Serial.println(rightError);
 
-      float leftAdjustment = leftSpeedController.PID(leftError);
-      float rightAdjustement = rightSpeedController.PID(rightError);
-      // Serial.print("Left and right adjustments = "); Serial.print(leftAdjustment);
-      // Serial.print(", ");Serial.println(rightAdjustement);
+      if(leftEncoderCounter % 2 == 0){
+        auto time_us = micros() - leftEncoder.lastEdgeTime();
+        float countChange = leftEncoderCounter - lastLeftCount;
 
-      leftPercentage += leftAdjustment;
-      rightPercentage += rightAdjustement;
+        leftMeasurement_cms = (countChange / static_cast<long>(time_us) * 1e-6)
+                              * (2 * CM_PER_COUNT);
+
+        float error = (targetLeftSpeed - leftMeasurement_cms) * SCALAR;
+        float leftAdjustment = leftSpeedController.PID(error);
+        leftPercentage += leftAdjustment;
+      }
+
+      if(rightEncoderCounter % 2 == 0){
+        auto time_us = micros() - righEncoder.lastEdgeTime();
+        float countChange = rightEncoderCounter - lastRightCount;
+
+        rightMeasurement_cms = (countChange / static_cast<long>(time_us) * 1e-6)
+                              * (2 * CM_PER_COUNT);
+
+        float error = (targetRightSpeed - rightMeasurement_cms) * SCALAR;
+        float rightAdustment = rightSpeedController.PID(error);
+        rightPercentage += rightAdustment;
+      }
 
     } else {
       // Serial.println("Unsafe");
@@ -294,3 +272,4 @@ bool safe(HCSR04 &ears){
 unsigned long timeSince_us(unsigned long start){
   return micros() - start;
 }
+
