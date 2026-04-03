@@ -9,13 +9,13 @@ void setup(){
   noStroke();
   rectMode(CENTER);
   
-  //connect to sam
-  if(sam != null) {
-    sam = new Client(this, IP, PORT);
-    if(sam.active()){
-      sam.write("Connected");//this is actually essential. WiFiServer::available() only pulls in client who have data waiting so we need to write something to be seen
-    } 
-  }
+  ////connect to sam
+  //if(sam != null) {
+  //  sam = new Client(this, IP, PORT);
+  //  if(sam.active()){
+  //    sam.write("Connected");//this is actually essential. WiFiServer::available() only pulls in client who have data waiting so we need to write something to be seen
+  //  } 
+  //}
   
   panel = new ControlP5(this);
   
@@ -24,11 +24,13 @@ void setup(){
   plot.addLayer(REFERENCE, new GPointsArray());
   plot.getLayer(REFERENCE).setLineColor(color(0, 114, 189));
   plot.getLayer(REFERENCE).setLineWidth(2);
+  plot.getLayer(REFERENCE).setPointColor(color(0, 114, 189));
   
   plot.addLayer(ACTUAL, new GPointsArray());
   plot.getLayer(ACTUAL).setLineColor(color(0));
   plot.getLayer(ACTUAL).setLineWidth(2);
-  
+  plot.getLayer(ACTUAL).setPointColor(color(0));
+
   plot.setXLim(0, 60);
   plot.setYLim(0, 50);
   
@@ -100,6 +102,8 @@ void setup(){
 
   leftIR = makeTextlabel(panel, Character.toString(comm_LEFT_IR_IN), 1000, 50, "Left IR sensor = 0");
   rightIR = makeTextlabel(panel, Character.toString(comm_RIGHT_IR_IN), 1000, 80, "Right IR sensor = 0");
+  mseTextlabel = makeTextlabel(panel, "MSE", width/2 - 30, 725, "MSE = 0");
+  mseTextlabel.setFont(createFont("Arial", 24));
   
   leftSlider = makeSlider(panel, Character.toString(comm_LEFT_IR), 1020, 120, 30, 300, 0, 1, "Left");  
   leftSlider.setValue(0.3);
@@ -109,39 +113,34 @@ void setup(){
   stopToggle = makeToggle(panel, Character.toString(comm_STOP_TOGGLE), 540, 100, 150, 70, "Stop/Start");
   
   setupCommandHandlers();
+  
 }
 
 void draw(){
-  if (sam == null || !sam.active()) {
-    if (frameCount % 120 == 0) {
-      sam = new Client(this, IP, PORT);
-      if (sam != null && sam.active()) {
-        sam.write("hi\n");
-      }
-    }
-  }
+  //if (sam == null || !sam.active()) {
+  //  if (frameCount % 120 == 0) {
+  //    sam = new Client(this, IP, PORT);
+  //    if (sam != null && sam.active()) {
+  //      sam.write("hi\n");
+  //    }
+  //  }
+  //}
   
   background(255);
   fill(0);
   textSize(32);
   textAlign(CENTER,CENTER);
-  
-  background(255);
-  plot.beginDraw();
-  plot.drawBox();
-  plot.drawBox();
-  plot.drawGridLines(2);  
-  plot.drawXAxis();
-  plot.drawYAxis();
-  plot.drawTitle();
-  plot.drawPoints();
-  plot.setGridLineColor(color(220));  
-  plot.getLayer(REFERENCE).drawLines();
-  plot.endDraw();
+
+  drawPlot();
   
   clearTextfield(timeTextfields, timeFocuses);
   clearTextfield(speedTextfields, speedFocuses);
   clearTextfield(PIDTextfields, PIDFocuses);
   read(sam);
-  updateReferenceData(plot, timeTextfields, speedTextfields);
+  updateReferenceData(plot, timeTextfields, speedTextfields, actualTimes, referenceSpeedsForMSE);
+  updateActualData(plot, actualTimes, actualSpeeds);
+  
+  
+  mseTextlabel.setText("MSE = " + MeanSquaredError(actualSpeeds, referenceSpeedsForMSE));
+  
 }

@@ -89,7 +89,7 @@ GPlot makeGPlot(String title, int x, int y, int w, int h, String xTitle, String 
 GPointsArray makeGPointsArray(ArrayList<Float> x, ArrayList<Float> y){
   GPointsArray array = new GPointsArray();
   
-  if(x.size() != y.size()){
+  if(x.size() != y.size() || x.size() == 0 || y.size() == 0){
     return null;
   }
   

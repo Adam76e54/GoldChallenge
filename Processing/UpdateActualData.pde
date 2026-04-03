@@ -4,6 +4,6 @@ void updateActualData(GPlot plot,
 
   GPointsArray points = makeGPointsArray(actualTimes, actualSpeeds);
   
-  plot.getLayer(ACTUAL).setPoints(points);
+  if(points != null) plot.getLayer(ACTUAL).setPoints(points);
                            
 }
