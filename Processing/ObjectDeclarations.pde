@@ -5,7 +5,8 @@ Textlabel leftIR,
           rightIR, 
           timeTextlabel, 
           speedTextlabel,
-          PIDTextlabel;
+          PIDTextlabel,
+          mseTextlabel;
 
 ControlP5 panel;
 
@@ -46,6 +47,8 @@ final String ACTUAL = "Actual";
 
 ArrayList<Float> actualTimes = new ArrayList<Float>();
 ArrayList<Float> actualSpeeds = new ArrayList<Float>();
+ArrayList<Float> referenceSpeedsForMSE = new ArrayList<Float>();
+
 
 ArrayList<Float> lastTimes  = new ArrayList<Float>();
 ArrayList<Float> lastSpeeds = new ArrayList<Float>();

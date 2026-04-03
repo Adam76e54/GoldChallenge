@@ -16,7 +16,9 @@ void markAllTimeFieldsError(ArrayList<Textfield> timeFields) {
 
 void updateReferenceData(GPlot plot,
                          ArrayList<Textfield> timeFields,
-                         ArrayList<Textfield> speedFields) {
+                         ArrayList<Textfield> speedFields,
+                         ArrayList<Float> actualTimes,
+                         ArrayList<Float> referenceSpeedsForMSE) {
 
   ArrayList<Float> durations = new ArrayList<Float>();
   ArrayList<Float> speeds    = new ArrayList<Float>();
@@ -100,11 +102,23 @@ void updateReferenceData(GPlot plot,
   GPointsArray points = makeGPointsArray(times, speeds);
   plot.getLayer(REFERENCE).setPoints(points);
 
-  // 5. Update cache (store durations or cumulative times)-
-  lastTimes.clear();
-  lastTimes.addAll(times);   // or durations, depending on what you want cached
-  lastSpeeds.clear();
-  lastSpeeds.addAll(speeds);
+
+
+  if (actualTimes.size() > 0) {
+    referenceSpeedsForMSE.clear();
+  
+    for (int i = 0; i < actualTimes.size(); i++) {
+      float t = actualTimes.get(i);
+      int idx = 0;
+  
+      while (idx + 1 < times.size() && times.get(idx + 1) <= t) {
+        idx++;
+      }
+  
+      idx = min(idx, speeds.size() - 1);
+      referenceSpeedsForMSE.add(speeds.get(idx));
+    }
+  }
 }
 
 boolean floatEqual(Float a, Float b) {
