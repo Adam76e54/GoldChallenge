@@ -200,7 +200,7 @@ void forward(L293D& driver, HCSR04& ears,
         auto time_us = micros() - leftEncoder.lastEdgeTime();
         float countChange = leftEncoderCounter - lastLeftCount;
 
-        leftMeasurement_cms = (countChange / static_cast<long>(time_us) * 1e-6)
+        leftMeasurement_cms = (countChange / (time_us * 1e-6))
                               * (COUNTS_TO_USE * CM_PER_COUNT);
 
         float error = (targetLeftSpeed - leftMeasurement_cms) * SCALAR;
@@ -212,7 +212,7 @@ void forward(L293D& driver, HCSR04& ears,
         auto time_us = micros() - rightEncoder.lastEdgeTime();
         float countChange = rightEncoderCounter - lastRightCount;
 
-        rightMeasurement_cms = (countChange / static_cast<long>(time_us) * 1e-6)
+        rightMeasurement_cms = (countChange / (time_us * 1e-6))
                               * (COUNTS_TO_USE * CM_PER_COUNT);
 
         float error = (targetRightSpeed - rightMeasurement_cms) * SCALAR;
