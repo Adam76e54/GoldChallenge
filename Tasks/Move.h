@@ -30,6 +30,9 @@ void decide(void*){
   HCSR04 ears(8, A5);
   ears.begin();
 
+  leftEncoder.begin(leftISR);
+  rightEncoder.begin(rightISR);
+
   Serial.println("Started move task");
 
   // Local copies of data.arrays
@@ -85,11 +88,11 @@ void forward(L293D& driver, HCSR04& ears,
     }
   );
   float angleKp = 0;
-  access(angleSemaphore, pdMS_TO_TICKS(50), [&]{
+  access(angleSemaphore, pdMS_TO_TICKS(50), [&angleKp]{
     angleKp = angleCoefficients.kp;
   });
   uint16_t leftThreshold = 0, rightThreshold = 0;
-  access(thresholdSemaphore, pdMS_TO_TICKS(50), [](){
+  access(thresholdSemaphore, pdMS_TO_TICKS(50), [&leftThreshold, &rightThreshold](){
     leftThreshold = thresholds.left;
     rightThreshold = thresholds.right;
   });
@@ -112,7 +115,7 @@ void forward(L293D& driver, HCSR04& ears,
   float rightPercentage = currentTargetSpeed / (float) MAX_CMS;
 
   constexpr unsigned long MAX_TIME_us = 60 * 1e6;
-  constexpr unsigned long SAMPLE_RATE_us = 1 * 1e6;
+  constexpr unsigned long SAMPLE_RATE_us = 5 * 1e5;
   const auto start = micros();
 
   unsigned long lastLeftCount = 0, lastRightCount = 0;
@@ -121,7 +124,7 @@ void forward(L293D& driver, HCSR04& ears,
 
   unsigned long lastSample = micros();
   
-  unsigned long rightIrCounter = 0, leftIrCounter = 0;
+  // unsigned long rightIrCounter = 0, leftIrCounter = 0;
   unsigned long rightEncoderCounter = 0, leftEncoderCounter = 0;
 
   bool stopped = false;
@@ -162,7 +165,7 @@ void forward(L293D& driver, HCSR04& ears,
 
       // 1. FOLLOW LINE
       bool leftOnLine = false, rightOnLine = false;
-      access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine]() {
+      access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine, leftThreshold, rightThreshold]() {
         leftOnLine = sensors.left < leftThreshold ;
 
         rightOnLine = sensors.right < rightThreshold;
@@ -175,7 +178,7 @@ void forward(L293D& driver, HCSR04& ears,
       float targetLeftSpeed = currentTargetSpeed, targetRightSpeed = currentTargetSpeed;
 
       if(rightOnLine){
-        targetLeftSpeed +=  * angleKp;
+        targetLeftSpeed += currentTargetSpeed * angleKp;
         targetRightSpeed -= currentTargetSpeed * angleKp;
       } 
 
@@ -192,25 +195,25 @@ void forward(L293D& driver, HCSR04& ears,
       rightEncoderCounter = rightEncoder.count();
       
       constexpr float SCALAR = 0.0001; // This is just to make the PID numbers bigger
-
-      if(leftEncoderCounter % 2 == 0){
+      constexpr uint8_t COUNTS_TO_USE = 1;
+      if(leftEncoderCounter % COUNTS_TO_USE == 0){
         auto time_us = micros() - leftEncoder.lastEdgeTime();
         float countChange = leftEncoderCounter - lastLeftCount;
 
         leftMeasurement_cms = (countChange / static_cast<long>(time_us) * 1e-6)
-                              * (2 * CM_PER_COUNT);
+                              * (COUNTS_TO_USE * CM_PER_COUNT);
 
         float error = (targetLeftSpeed - leftMeasurement_cms) * SCALAR;
         float leftAdjustment = leftSpeedController.PID(error);
         leftPercentage += leftAdjustment;
       }
 
-      if(rightEncoderCounter % 2 == 0){
-        auto time_us = micros() - righEncoder.lastEdgeTime();
+      if(rightEncoderCounter % COUNTS_TO_USE == 0){
+        auto time_us = micros() - rightEncoder.lastEdgeTime();
         float countChange = rightEncoderCounter - lastRightCount;
 
         rightMeasurement_cms = (countChange / static_cast<long>(time_us) * 1e-6)
-                              * (2 * CM_PER_COUNT);
+                              * (COUNTS_TO_USE * CM_PER_COUNT);
 
         float error = (targetRightSpeed - rightMeasurement_cms) * SCALAR;
         float rightAdustment = rightSpeedController.PID(error);
@@ -221,7 +224,7 @@ void forward(L293D& driver, HCSR04& ears,
       if(auto interval = timeSince_us(lastSample); interval >= SAMPLE_RATE_us){
         // Notify telemetry to send data.
         float velocity = (leftMeasurement_cms + rightMeasurement_cms) / 2.0f;
-        access(arraySemaphore, pdMS_TO_TICKS(5), [](){
+        access(arraySemaphore, pdMS_TO_TICKS(5), [velocity, currentTime_us](){
           data.currentActualSpeed = velocity;
           data.currentActualTime = currentTime_us;
         });
