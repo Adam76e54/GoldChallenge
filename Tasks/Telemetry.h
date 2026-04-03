@@ -61,17 +61,25 @@ void telemetry(void*){
 
     // Send actual speeds and times
     uint32_t idx;
-    uint16_t time = 0, speed = 0;
+    float time = 0, speed = 0;
 
     if(xTaskNotifyWait(0, 0xFFFFFFFF, &idx, pdMS_TO_TICKS(50))){
-      access(arraySemaphore, pdMS_TO_TICKS(5), [idx](){
-        times = data.actualTimes[idx];
-        speeds = data.actualSpeeds[idx];
+      access(arraySemaphore, pdMS_TO_TICKS(5), [&idx, &time, &speed](){
+        time = (float)data.currentActualTime;
+        speed = (float)data.currentActualSpeed;
       });
 
+
+
       char delimiter = static_cast<char>(comm::DELIMITER);
+      GUI.print(static_cast<char>(comm::ACTUAL_TIME)); GUI.print(delimiter);
+      GUI.print(idx); GUI.print(delimiter) ; GUI.println(time);  
+
+      Serial.print(static_cast<char>(comm::ACTUAL_TIME)); Serial.print(delimiter);
+      Serial.print(idx); Serial.print(delimiter) ; Serial.println(time);  
+      
       GUI.print(static_cast<char>(comm::ACTUAL_SPEED)); GUI.print(delimiter);
-      GUI.print(idx); GUI.print(delimiter) ; GUI.println()
+      GUI.print(idx); GUI.print(delimiter) ; GUI.println(speed);
     }
 
 

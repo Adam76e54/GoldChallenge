@@ -18,6 +18,9 @@ void read(Client sam) {
   String cmd = line.substring(0, firstColon);
   String payload = trim(line.substring(firstColon + 1));
 
+  if(cmd.length() == 0) return;
+  if(cmd.charAt(0) == comm_ACTUAL_TIME || cmd.charAt(0) == comm_ACTUAL_SPEED) print(line + "\n");
+    
   CommandHandler h = handlers.get(cmd.charAt(0));
   
   if (h != null) {
@@ -59,10 +62,18 @@ void setupCommandHandlers(){
       int idx = parseInt(strIdx);
       float value = parseFloat(strValue);
       
+      if(idx < 0) return;
+
+      
       if(idx < actualTimes.size()){
         actualTimes.set(idx, value); 
       } else {
-        actualTimes.add(value); 
+        
+        while (actualTimes.size() < idx) {
+          actualTimes.add(0.0);
+        }
+        
+        actualTimes.add(value); // now this will be at index idx
       }
       
     }
@@ -80,10 +91,16 @@ void setupCommandHandlers(){
       int idx = parseInt(strIdx);
       float value = parseFloat(strValue);
       
-      if(idx < actualTimes.size()){
+      if(idx < 0) return;
+      
+      if(idx < actualSpeeds.size()){
         actualSpeeds.set(idx, value); 
       } else {
-        actualSpeeds.add(value); 
+        while (actualSpeeds.size() < idx) {
+          actualSpeeds.add(0.0);
+        }
+        
+        actualSpeeds.add(value); // now this will be at index idx
       }
       
     }

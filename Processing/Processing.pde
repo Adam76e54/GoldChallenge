@@ -24,11 +24,13 @@ void setup(){
   plot.addLayer(REFERENCE, new GPointsArray());
   plot.getLayer(REFERENCE).setLineColor(color(0, 114, 189));
   plot.getLayer(REFERENCE).setLineWidth(2);
+  plot.getLayer(REFERENCE).setPointColor(color(0, 114, 189));
   
   plot.addLayer(ACTUAL, new GPointsArray());
   plot.getLayer(ACTUAL).setLineColor(color(0));
   plot.getLayer(ACTUAL).setLineWidth(2);
-  
+  plot.getLayer(ACTUAL).setPointColor(color(0));
+
   plot.setXLim(0, 60);
   plot.setYLim(0, 50);
   
@@ -137,6 +139,7 @@ void draw(){
   plot.drawPoints();
   plot.setGridLineColor(color(220));  
   plot.getLayer(REFERENCE).drawLines();
+  plot.getLayer(ACTUAL).drawLines();
   plot.endDraw();
   
   clearTextfield(timeTextfields, timeFocuses);
@@ -144,4 +147,5 @@ void draw(){
   clearTextfield(PIDTextfields, PIDFocuses);
   read(sam);
   updateReferenceData(plot, timeTextfields, speedTextfields);
+  updateActualData(plot, actualTimes, actualSpeeds);
 }

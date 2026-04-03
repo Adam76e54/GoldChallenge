@@ -38,12 +38,6 @@ void decide(void*){
   while(true){
     xTaskDelayUntil(&lastWakeTime, period);
 
-    // Make non volatile local copies of the data, just for clarity
-    uint16_t left = sensors.left;
-    uint16_t right = sensors.right;
-
-
-
     // Fetch targets if changed
     if(xSemaphoreTake(arraySemaphore, pdMS_TO_TICKS(WAIT_TIME_MS)) == pdTRUE){
 
@@ -74,8 +68,8 @@ void decide(void*){
 void forward(L293D& driver, HCSR04& ears, 
              uint8_t targetSpeeds[], uint8_t targetTimes[]){
 
-  constexpr TickType_t period = pdMS_TO_TICKS(5);
-  TickType_t lastWakeTime = xTaskGetTickCount();
+  // constexpr TickType_t period = pdMS_TO_TICKS(5);
+  // TickType_t lastWakeTime = xTaskGetTickCount();
 
   // Set up controllers
   Controller rightSpeedController(0,0,0), leftSpeedController(0,0,0);
@@ -94,9 +88,9 @@ void forward(L293D& driver, HCSR04& ears,
 
   uint8_t targetsIdx = 0, actualsIdx = 0;
   uint16_t currentTargetSpeed = targetSpeeds[targetsIdx];
-  Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
+  // Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
   unsigned long currentChangeTime_us = (unsigned long)targetTimes[targetsIdx] * 1e6;
-  Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
+  // Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
 
   float leftPercentage = currentTargetSpeed / (float) MAX_CMS;
   float rightPercentage = currentTargetSpeed / (float) MAX_CMS;
@@ -111,6 +105,8 @@ void forward(L293D& driver, HCSR04& ears,
   float leftMeasurement_cms = 0, rightMeasurement_cms = 0;
   bool stopped = false;
   
+  unsigned long rightIrCounter = 0, leftIrCounter = 0;
+
   bool timeout = false;
   while(!timeout && !stopped){
     // Block periodically, this is a bit janky but i'd need a big refactor if I want it smoother.
@@ -143,8 +139,8 @@ void forward(L293D& driver, HCSR04& ears,
 
     if(safe(ears)){
       // Serial.println("Safe");
-      Serial.print("Left and right percentages = "); Serial.print(leftPercentage);
-      Serial.print(", ");Serial.println(rightPercentage);
+      // Serial.print("Left and right percentages = "); Serial.print(leftPercentage);
+      // Serial.print(", ");Serial.println(rightPercentage);
 
       driver.forward(leftPercentage, rightPercentage);
 
@@ -169,9 +165,9 @@ void forward(L293D& driver, HCSR04& ears,
 
         // Notify telemetry to send data.
         float velocity = (leftMeasurement_cms + rightMeasurement_cms) / 2.0f;
-        access(arraySemaphore, pdMS_TO_TICKS(5), [](){
+        access(arraySemaphore, pdMS_TO_TICKS(5), [velocity, currentTime_us](){
           data.currentActualSpeed = velocity;
-          data.currentActualTime = currentTime_us;
+          data.currentActualTime = currentTime_us * 1e-6;
         });
         xTaskNotify(telemetryTaskHandle, actualsIdx, eSetValueWithoutOverwrite);
         ++actualsIdx;
@@ -193,37 +189,54 @@ void forward(L293D& driver, HCSR04& ears,
 
       bool leftOnLine = false, rightOnLine = false;
       access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine]() {
-        leftOnLine = sensors.left < leftThreshold;
+        leftOnLine = sensors.left < leftThreshold ;
+
         rightOnLine = sensors.right < rightThreshold;
+
+        // Serial.print("Sensors.right = "); Serial.println(sensors.right);
+        // Serial.print("Right threshold = "); Serial.println(rightThreshold);
       });
 
       // Counters for estimating target angular velocity
-      static unsigned long rightIrCounter = 0, leftIrCounter = 0;
-      rightIrCounter = rightOnLine ? rightIrCounter + 1 : 0;
+      // rightIrCounter = rightOnLine ? rightIrCounter + 1 : 0;
+      if(rightOnLine){
+        ++rightIrCounter;
+      } else {
+        rightIrCounter = 0;
+      }
+
       leftIrCounter = leftOnLine ? leftIrCounter + 1 : 0;
 
+      // Serial.print("Left ir counter = "); Serial.println(leftIrCounter);
+      // Serial.print("Right ir counter = "); Serial.println(rightIrCounter);
       // Adjust targetAngularVelocity
-      float targetAngularVelocity = 0;
+      float omega = 0; 
+      static float angleKp = 0;
       access(angleSemaphore, pdMS_TO_TICKS(5), [&]{
-        targetAngularVelocity = (rightIrCounter * rightIrCounter) * angleCoefficients.kp
-                                 - (leftIrCounter * leftIrCounter) * angleCoefficients.kp;
+        angleKp = angleCoefficients.kp;
       });
 
+      omega = (rightIrCounter) * angleKp
+                                - (leftIrCounter) * angleKp;
       // Set left and right target speeds based on angular velocity target
-      float targetLeftSpeed = currentTargetSpeed - (targetAngularVelocity * AXLE / 2.0f);
-      float targetRightSpeed = currentTargetSpeed + (targetAngularVelocity * AXLE / 2.0f);
+      float targetLeftSpeed = currentTargetSpeed - (omega * AXLE / 2.0f);
+      float targetRightSpeed = currentTargetSpeed + (omega * AXLE / 2.0f);
+
+      Serial.print("Omega = "); Serial.println(omega);
+      Serial.print("Left target speed = "); Serial.println(targetLeftSpeed);
+      Serial.print("Right target speed = "); Serial.println(targetRightSpeed);
 
       // - PID ADJUSTMENT -
       constexpr float SCALAR = 0.0001; // This is just to make the PID numbers bigger
       float leftError = (targetLeftSpeed - leftMeasurement_cms) * SCALAR;
       float rightError = (targetRightSpeed - rightMeasurement_cms) * SCALAR;
-      Serial.print("Left and right errors = "); Serial.print(leftError);
-      Serial.print(", ");Serial.println(rightError);
+      // Serial.print("Left and right errors = "); Serial.print(leftError);
+      // Serial.print(", ");Serial.println(rightError);
 
       float leftAdjustment = leftSpeedController.PID(leftError);
       float rightAdjustement = rightSpeedController.PID(rightError);
-      Serial.print("Left and right adjustments = "); Serial.print(leftAdjustment);
-      Serial.print(", ");Serial.println(rightAdjustement);
+      // Serial.print("Left and right adjustments = "); Serial.print(leftAdjustment);
+      // Serial.print(", ");Serial.println(rightAdjustement);
 
       leftPercentage += leftAdjustment;
       rightPercentage += rightAdjustement;

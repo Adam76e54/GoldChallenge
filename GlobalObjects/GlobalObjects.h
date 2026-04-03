@@ -58,8 +58,8 @@ struct Arrays{
   uint16_t targetTimes[ARRAY_SIZE] = {0};
   uint16_t targetSpeeds[ARRAY_SIZE] = {0};
 
-  uint16_t currentActualTime = 0;
-  uint16_t currentActualSpeed = 0;
+  float currentActualTime = 0;
+  float currentActualSpeed = 0;
 };
 
 // EEPROM addresses

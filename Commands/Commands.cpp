@@ -18,6 +18,11 @@ namespace comm{
     handlerTable[static_cast<uint8_t>(comm::KI)] = &handleCoefficients;
     handlerTable[static_cast<uint8_t>(comm::KD)] = &handleCoefficients;
 
+    handlerTable[static_cast<uint8_t>(comm::TURNING_FACTOR)] = &handleTurningFactor;
+
+    handlerTable[static_cast<uint8_t>(comm::LEFT_IR)] = &handleThresholds;
+    handlerTable[static_cast<uint8_t>(comm::RIGHT_IR)] = &handleThresholds;
+
   }
 
   void print(Command&){
@@ -75,6 +80,7 @@ namespace comm{
         
         case comm::RIGHT_IR:
           thresholds.right = MAX * atof(cmd.payload);
+          Serial.print("Changed right threshold = "); Serial.println(thresholds.right);
         break;
       }
 
@@ -87,7 +93,7 @@ namespace comm{
     if(xSemaphoreTake(angleSemaphore, pdMS_TO_TICKS(5)) == pdTRUE){
 
       angleCoefficients.kp = atof(cmd.payload);
-      
+      Serial.print("Changed turning factor = "); Serial.println(angleCoefficients.kp);
       xSemaphoreGive(angleSemaphore);
     }
   }
