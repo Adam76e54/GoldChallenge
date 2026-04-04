@@ -94,6 +94,15 @@ void setup(){
     PIDTextfields.add(field);
     
     setupCommandHandlers();
+    
+    actualTimes.add(1.0);
+    actualSpeeds.add(10.0);
+    
+    actualTimes.add(1.5);
+    actualSpeeds.add(10.0);
+    
+    actualTimes.add(10.0);
+    actualSpeeds.add(10.0);
   }
 
   timeTextlabel = makeTextlabel(panel, "__TimeTextlabel", 15, timesY + 5, "Times");
@@ -141,6 +150,6 @@ void draw(){
   updateActualData(plot, actualTimes, actualSpeeds);
   
   
-  mseTextlabel.setText("MSE = " + MeanSquaredError(actualSpeeds, referenceSpeedsForMSE));
+  mseTextlabel.setText("MSE = " + meanSquaredError(actualSpeeds, referenceSpeedsForMSE));
   
 }

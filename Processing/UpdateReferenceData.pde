@@ -111,7 +111,7 @@ void updateReferenceData(GPlot plot,
       float t = actualTimes.get(i);
       int idx = 0;
   
-      while (idx + 1 < times.size() && times.get(idx + 1) <= t) {
+      while (idx + 1 < times.size() && times.get(idx + 1) < t) {
         idx++;
       }
   
