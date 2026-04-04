@@ -31,10 +31,8 @@ namespace comm{
 
   void handleStopToggle(Command& stop){
     if(xSemaphoreTake(stoppedSemaphore, pdMS_TO_TICKS(50)) == pdTRUE){
-      // Read in as a number since the GUI sends 0/1 not true/false
-      uint8_t value = atoi(stop.payload);
-      // Convert nicely to bool 
-      state.stopped = (value != 0);
+      // Toggle stopped
+      state.stopped = !state.stopped;
 
       // Serial.print("Recieved p = "); Serial.println(value);
       // Serial.print("Changed stopped to "); Serial.println(state.stopped ? "true" : "false");
