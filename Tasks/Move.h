@@ -225,6 +225,7 @@ void forward(L293D& driver, HCSR04& ears,
       }
 
 
+      // - 3. SEND TO TELEMETRY - 
       if(auto interval = timeSince_us(lastSample); interval >= SAMPLE_RATE_us){
         // Notify telemetry to send data.
         float velocity = (leftMeasurement_cms + rightMeasurement_cms) / 2.0f;
@@ -247,6 +248,7 @@ void forward(L293D& driver, HCSR04& ears,
 
   }
 
+  // Stop after a run
   access(stoppedSemaphore, pdMS_TO_TICKS(50), [](){
     state.stopped = true;
   });
