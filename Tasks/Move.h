@@ -196,7 +196,7 @@ void forward(L293D& driver, HCSR04& ears,
       
       constexpr float SCALAR = 0.0001; // This is just to make the PID numbers bigger
       constexpr uint8_t COUNTS_TO_USE = 1;
-      if(leftEncoderCounter % COUNTS_TO_USE == 0){
+      if(leftEncoderCounter- lastLeftCount == COUNTS_TO_USE){
         auto time_us = micros() - leftEncoder.lastEdgeTime();
         float countChange = leftEncoderCounter - lastLeftCount;
 
@@ -205,10 +205,12 @@ void forward(L293D& driver, HCSR04& ears,
 
         float error = (targetLeftSpeed - leftMeasurement_cms) * SCALAR;
         float leftAdjustment = leftSpeedController.PID(error);
+
         leftPercentage += leftAdjustment;
+        lastLeftCount = leftEncoderCounter;
       }
 
-      if(rightEncoderCounter % COUNTS_TO_USE == 0){
+      if(rightEncoderCounter - lastRightCount == COUNTS_TO_USE){
         auto time_us = micros() - rightEncoder.lastEdgeTime();
         float countChange = rightEncoderCounter - lastRightCount;
 
@@ -217,7 +219,9 @@ void forward(L293D& driver, HCSR04& ears,
 
         float error = (targetRightSpeed - rightMeasurement_cms) * SCALAR;
         float rightAdustment = rightSpeedController.PID(error);
+        
         rightPercentage += rightAdustment;
+        lastRightCount = rightEncoderCounter;
       }
 
 
