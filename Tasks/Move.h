@@ -178,17 +178,24 @@ void forward(L293D& driver, HCSR04& ears,
       float targetLeftSpeed = currentTargetSpeed, targetRightSpeed = currentTargetSpeed;
 
       if(rightOnLine){
+        // NOTE: angleKp will probably need to be ~ 0.8-0.9
         targetLeftSpeed += currentTargetSpeed * angleKp;
+        targetLeftSpeed = constrain(targetLeftSpeed, 0.0f, 2 * currentTargetSpeed);
+
         targetRightSpeed -= currentTargetSpeed * angleKp;
-      } 
+        targetRightSpeed = constrain(targetRightSpeed, 0.0f, 2*currentTargetSpeed);
+      }
 
       if(leftOnLine){
         targetLeftSpeed -= currentTargetSpeed * angleKp;
+        targetLeftSpeed = constrain(targetLeftSpeed, 0.0f, 2 * currentTargetSpeed);
+      
         targetRightSpeed += currentTargetSpeed * angleKp;
+        targetRightSpeed = constrain(targetRightSpeed, 0.0f, 2*currentTargetSpeed);
       }
 
-      Serial.print("Left target speed = "); Serial.println(targetLeftSpeed);
-      Serial.print("Right target speed = "); Serial.println(targetRightSpeed);
+      // Serial.print("Left target speed = "); Serial.println(targetLeftSpeed);
+      // Serial.print("Right target speed = "); Serial.println(targetRightSpeed);
 
       // - 2. MEAUSURE SPEED -> PID ADJUSTMENT -
       leftEncoderCounter = leftEncoder.count();
