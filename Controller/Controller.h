@@ -19,6 +19,7 @@ class Controller {
       // Empty
     }
 
+  __attribute__((optimize("O2"))) 
   float PID(float error){
     auto now = millis();
     auto dt = (now - lastTime) * 1e-3; // units in seconds
