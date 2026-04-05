@@ -29,7 +29,7 @@ namespace comm{
     // Serial.println("That worked");
   }
 
-  void handleStopToggle(Command& stop){
+  void handleStopToggle(Command&){
     if(xSemaphoreTake(stoppedSemaphore, pdMS_TO_TICKS(50)) == pdTRUE){
       // Toggle stopped
       state.stopped = !state.stopped;
