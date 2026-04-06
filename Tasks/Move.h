@@ -12,6 +12,7 @@
 #include "ISR.h"
 
 
+
 ROB12629 leftEncoder(2), rightEncoder(3);
 
 void forward(L293D& driver, HCSR04& ears, 
@@ -40,7 +41,6 @@ void decide(void*){
 
   // How long to wait for Semaphores
   constexpr uint16_t WAIT_TIME_MS = 50;
-
 
   while(true){
     xTaskDelayUntil(&lastWakeTime, period);
@@ -75,6 +75,7 @@ void decide(void*){
 void forward(L293D& driver, HCSR04& ears, 
              uint8_t targetSpeeds[], uint8_t targetTimes[]){
 
+  #pragma region // initialising stuff outside loop
   // constexpr TickType_t period = pdMS_TO_TICKS(5);
   // TickType_t lastWakeTime = xTaskGetTickCount();
 
@@ -106,13 +107,13 @@ void forward(L293D& driver, HCSR04& ears,
   // constexpr float AXLE = 13.5f;
 
   uint8_t targetsIdx = 0, actualsIdx = 0;
-  uint16_t currentTargetSpeed = targetSpeeds[targetsIdx];
+  uint16_t currentTargetSpeed_cms = targetSpeeds[targetsIdx];
   // Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
   unsigned long currentChangeTime_us = (unsigned long)targetTimes[targetsIdx] * 1e6;
   // Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
 
-  float leftPercentage = currentTargetSpeed / (float) MAX_CMS;
-  float rightPercentage = currentTargetSpeed / (float) MAX_CMS;
+  float leftPercentage = currentTargetSpeed_cms / (float) MAX_CMS;
+  float rightPercentage = currentTargetSpeed_cms / (float) MAX_CMS;
 
   constexpr unsigned long MAX_TIME_us = 60 * 1e6;
   constexpr unsigned long SAMPLE_RATE_us = 5 * 1e5;
@@ -126,10 +127,16 @@ void forward(L293D& driver, HCSR04& ears,
   
   // unsigned long rightIrCounter = 0, leftIrCounter = 0;
   unsigned long rightEncoderCounter = 0, leftEncoderCounter = 0;
+  unsigned long lastLeftTime_us = micros(); unsigned long lastRightTime_us = lastLeftTime_us;
 
+  #pragma endregion
+
+  
+  // Initiliasing the loop condition !stopped and !timeout
   bool stopped = false;
   access(stoppedSemaphore, pdMS_TO_TICKS(50), [&stopped](){stopped = state.stopped;});
   bool timeout = false;
+
   while(!timeout && !stopped){
     // Block periodically, this is a bit janky but i'd need a big refactor if I want it smoother.
     // Serial.println("Going forward:");
@@ -148,7 +155,7 @@ void forward(L293D& driver, HCSR04& ears,
       ++targetsIdx;
       // Serial.print("Idx = "); Serial.println(idx);
       currentChangeTime_us += (unsigned long)targetTimes[targetsIdx] * 1e6;
-      currentTargetSpeed = targetSpeeds[targetsIdx];
+      currentTargetSpeed_cms = targetSpeeds[targetsIdx];
     
       // Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
       // Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
@@ -164,6 +171,7 @@ void forward(L293D& driver, HCSR04& ears,
       driver.forward(leftPercentage, rightPercentage);
 
       // 1. FOLLOW LINE
+      #pragma region
       bool leftOnLine = false, rightOnLine = false;
       access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine, leftThreshold, rightThreshold]() {
         leftOnLine = sensors.left < leftThreshold ;
@@ -175,63 +183,69 @@ void forward(L293D& driver, HCSR04& ears,
       });
 
       // Set left and right target speeds based on angular velocity target
-      float targetLeftSpeed = currentTargetSpeed, targetRightSpeed = currentTargetSpeed;
+      float targetLeftSpeed_cms = currentTargetSpeed_cms, targetRightSpeed_cms = currentTargetSpeed_cms;
 
       if(rightOnLine){
         // NOTE: angleKp will probably need to be ~ 0.8-0.9
-        targetLeftSpeed += currentTargetSpeed * angleKp;
-        targetLeftSpeed = constrain(targetLeftSpeed, 0.0f, 2 * currentTargetSpeed);
+        targetLeftSpeed_cms += currentTargetSpeed_cms * angleKp;
+        targetLeftSpeed_cms = constrain(targetLeftSpeed_cms, 0.0f, 2 * currentTargetSpeed_cms);
 
-        targetRightSpeed -= currentTargetSpeed * angleKp;
-        targetRightSpeed = constrain(targetRightSpeed, 0.0f, 2*currentTargetSpeed);
+        targetRightSpeed_cms -= currentTargetSpeed_cms * angleKp;
+        targetRightSpeed_cms = constrain(targetRightSpeed_cms, 0.0f, 2*currentTargetSpeed_cms);
       }
 
       if(leftOnLine){
-        targetLeftSpeed -= currentTargetSpeed * angleKp;
-        targetLeftSpeed = constrain(targetLeftSpeed, 0.0f, 2 * currentTargetSpeed);
+        targetLeftSpeed_cms -= currentTargetSpeed_cms * angleKp;
+        targetLeftSpeed_cms = constrain(targetLeftSpeed_cms, 0.0f, 2 * currentTargetSpeed_cms);
       
-        targetRightSpeed += currentTargetSpeed * angleKp;
-        targetRightSpeed = constrain(targetRightSpeed, 0.0f, 2*currentTargetSpeed);
+        targetRightSpeed_cms += currentTargetSpeed_cms * angleKp;
+        targetRightSpeed_cms = constrain(targetRightSpeed_cms, 0.0f, 2*currentTargetSpeed_cms);
       }
 
       // Serial.print("Left target speed = "); Serial.println(targetLeftSpeed);
       // Serial.print("Right target speed = "); Serial.println(targetRightSpeed);
+      #pragma endregion
 
       // - 2. MEAUSURE SPEED -> PID ADJUSTMENT -
+      #pragma region
       leftEncoderCounter = leftEncoder.count();
       rightEncoderCounter = rightEncoder.count();
       
       constexpr float SCALAR = 0.0001; // This is just to make the PID numbers bigger
       constexpr uint8_t COUNTS_TO_USE = 1;
       if(leftEncoderCounter- lastLeftCount == COUNTS_TO_USE){
-        auto time_us = micros() - leftEncoder.lastEdgeTime();
-        float countChange = leftEncoderCounter - lastLeftCount;
+        unsigned long lastEdgeTime_us = leftEncoder.lastEdgeTime();
 
-        leftMeasurement_cms = (countChange / (time_us * 1e-6))
+        long time_us = lastEdgeTime_us - lastLeftTime_us;
+
+        leftMeasurement_cms = (COUNTS_TO_USE / (time_us * 1e-6))
                               * (COUNTS_TO_USE * CM_PER_COUNT);
 
-        float error = (targetLeftSpeed - leftMeasurement_cms) * SCALAR;
+        float error = (targetLeftSpeed_cms - leftMeasurement_cms) * SCALAR;
         float leftAdjustment = leftSpeedController.PID(error);
 
         leftPercentage += leftAdjustment;
         lastLeftCount = leftEncoderCounter;
+        lastLeftTime_us = lastEdgeTime_us;
       }
 
       if(rightEncoderCounter - lastRightCount == COUNTS_TO_USE){
-        auto time_us = micros() - rightEncoder.lastEdgeTime();
-        float countChange = rightEncoderCounter - lastRightCount;
+        unsigned long lastEdgeTime_us = rightEncoder.lastEdgeTime();
 
-        rightMeasurement_cms = (countChange / (time_us * 1e-6))
+        auto time_us = lastEdgeTime_us - lastRightTime_us;
+
+        rightMeasurement_cms = (COUNTS_TO_USE / (time_us * 1e-6))
                               * (COUNTS_TO_USE * CM_PER_COUNT);
 
-        float error = (targetRightSpeed - rightMeasurement_cms) * SCALAR;
+        float error = (targetRightSpeed_cms - rightMeasurement_cms) * SCALAR;
         float rightAdustment = rightSpeedController.PID(error);
         
         rightPercentage += rightAdustment;
         lastRightCount = rightEncoderCounter;
+        lastRightTime_us = lastEdgeTime_us;
       }
 
-
+      #pragma endregion
       // - 3. SEND TO TELEMETRY - 
       if(auto interval = timeSince_us(lastSample); interval >= SAMPLE_RATE_us){
         // Notify telemetry to send data.
