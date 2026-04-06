@@ -112,6 +112,9 @@ void forward(L293D& driver, HCSR04& ears,
   unsigned long currentChangeTime_us = (unsigned long)targetTimes[targetsIdx] * 1e6;
   // Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
 
+  // Set left and right target speeds based on angular velocity target
+  float targetLeftSpeed_cms = currentTargetSpeed_cms, targetRightSpeed_cms = currentTargetSpeed_cms;
+
   float leftPercentage = currentTargetSpeed_cms / (float) MAX_CMS;
   float rightPercentage = currentTargetSpeed_cms / (float) MAX_CMS;
 
@@ -168,45 +171,11 @@ void forward(L293D& driver, HCSR04& ears,
       // Serial.print("Left and right percentages = "); Serial.print(leftPercentage);
       // Serial.print(", ");Serial.println(rightPercentage);
 
+      leftPercentage = constrain(leftPercentage, 0.0f, 1.0f);
+      rightPercentage = constrain(rightPercentage, 0.0f, 1.0f);
       driver.forward(leftPercentage, rightPercentage);
 
-      // 1. FOLLOW LINE
-      #pragma region
-      bool leftOnLine = false, rightOnLine = false;
-      access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine, leftThreshold, rightThreshold]() {
-        leftOnLine = sensors.left < leftThreshold ;
-
-        rightOnLine = sensors.right < rightThreshold;
-
-        // Serial.print("Sensors.right = "); Serial.println(sensors.right);
-        // Serial.print("Right threshold = "); Serial.println(rightThreshold);
-      });
-
-      // Set left and right target speeds based on angular velocity target
-      float targetLeftSpeed_cms = currentTargetSpeed_cms, targetRightSpeed_cms = currentTargetSpeed_cms;
-
-      if(rightOnLine){
-        // NOTE: angleKp will probably need to be ~ 0.8-0.9
-        targetLeftSpeed_cms += currentTargetSpeed_cms * angleKp;
-        targetLeftSpeed_cms = constrain(targetLeftSpeed_cms, 0.0f, 2 * currentTargetSpeed_cms);
-
-        targetRightSpeed_cms -= currentTargetSpeed_cms * angleKp;
-        targetRightSpeed_cms = constrain(targetRightSpeed_cms, 0.0f, 2*currentTargetSpeed_cms);
-      }
-
-      if(leftOnLine){
-        targetLeftSpeed_cms -= currentTargetSpeed_cms * angleKp;
-        targetLeftSpeed_cms = constrain(targetLeftSpeed_cms, 0.0f, 2 * currentTargetSpeed_cms);
-      
-        targetRightSpeed_cms += currentTargetSpeed_cms * angleKp;
-        targetRightSpeed_cms = constrain(targetRightSpeed_cms, 0.0f, 2*currentTargetSpeed_cms);
-      }
-
-      // Serial.print("Left target speed = "); Serial.println(targetLeftSpeed);
-      // Serial.print("Right target speed = "); Serial.println(targetRightSpeed);
-      #pragma endregion
-
-      // - 2. MEAUSURE SPEED -> PID ADJUSTMENT -
+      // - 1. MEAUSURE SPEED -> PID ADJUSTMENT -
       #pragma region
       leftEncoderCounter = leftEncoder.count();
       rightEncoderCounter = rightEncoder.count();
@@ -246,6 +215,37 @@ void forward(L293D& driver, HCSR04& ears,
       }
 
       #pragma endregion
+      
+      // 2. FOLLOW LINE
+      #pragma region
+      bool leftOnLine = false, rightOnLine = false;
+      access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine, leftThreshold, rightThreshold]() {
+        leftOnLine = sensors.left < leftThreshold ;
+
+        rightOnLine = sensors.right < rightThreshold;
+
+        // Serial.print("Sensors.right = "); Serial.println(sensors.right);
+        // Serial.print("Right threshold = "); Serial.println(rightThreshold);
+      });
+
+
+      if(rightOnLine){
+        leftPercentage *= 1 + angleKp;
+
+        rightPercentage *= 1 - angleKp;
+      }
+
+      if(leftOnLine){
+        leftPercentage *= 1 - angleKp;
+
+        rightPercentage *= 1 + angleKp;
+      }
+
+
+      // Serial.print("Left target speed = "); Serial.println(targetLeftSpeed);
+      // Serial.print("Right target speed = "); Serial.println(targetRightSpeed);
+      #pragma endregion
+
       // - 3. SEND TO TELEMETRY - 
       if(auto interval = timeSince_us(lastSample); interval >= SAMPLE_RATE_us){
         // Notify telemetry to send data.
@@ -265,8 +265,6 @@ void forward(L293D& driver, HCSR04& ears,
       driver.brake(L293D_BRAKE_TIME);
       break;
     }
-
-
   }
 
   // Stop after a run
