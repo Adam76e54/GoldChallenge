@@ -10,6 +10,9 @@
 #include "GlobalObjects.h"
 #include "ISR.h"
 
+
+ROB12629 leftEncoder(2), rightEncoder(3);
+
 void forward(L293D& driver, HCSR04& ears, 
              uint8_t targetSpeed[], uint8_t targetTime[]);
         
@@ -25,6 +28,9 @@ void decide(void*){
 
   HCSR04 ears(8, A5);
   ears.begin();
+
+  leftEncoder.begin(leftISR);
+  rightEncoder.begin(rightISR);
 
   Serial.println("Started move task");
 
@@ -68,8 +74,8 @@ void decide(void*){
 void forward(L293D& driver, HCSR04& ears, 
              uint8_t targetSpeeds[], uint8_t targetTimes[]){
 
-  constexpr TickType_t period = pdMS_TO_TICKS(5);
-  TickType_t lastWakeTime = xTaskGetTickCount();
+  // constexpr TickType_t period = pdMS_TO_TICKS(5);
+  // TickType_t lastWakeTime = xTaskGetTickCount();
 
   // Set up controllers
   Controller rightSpeedController(0,0,0), leftSpeedController(0,0,0);
@@ -85,6 +91,13 @@ void forward(L293D& driver, HCSR04& ears,
   leftEncoder.reset(); rightEncoder.reset();
 
   constexpr uint8_t MAX_CMS = 40; // For initial guess at speeds
+
+
+  uint16_t leftThreshold = 0, rightThreshold = 0;
+  access(thresholdSemaphore, pdMS_TO_TICKS(50), [](){
+    leftThreshold = thresholds.left;
+    rightThreshold = thresholds.right;
+  });
 
   uint8_t targetsIdx = 0, actualsIdx = 0;
   uint16_t currentTargetSpeed = targetSpeeds[targetsIdx];
@@ -179,14 +192,9 @@ void forward(L293D& driver, HCSR04& ears,
       // - ANGULAR VELOCITY AND TARGET SPEEDS COMPUTATION - 
       constexpr float AXLE = 14.0f;
 
-      static uint16_t leftThreshold = 0, rightThreshold = 0;
-      access(thresholdSemaphore, pdMS_TO_TICKS(5), [](){
-        leftThreshold = thresholds.left;
-        rightThreshold = thresholds.right;
-      });
 
       bool leftOnLine = false, rightOnLine = false;
-      access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine]() {
+      access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine, leftThreshold, rightThreshold]() {
         leftOnLine = sensors.left < leftThreshold;
         rightOnLine = sensors.right < rightThreshold;
       });
