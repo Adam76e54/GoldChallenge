@@ -160,8 +160,6 @@ void forward(L293D& driver, HCSR04& ears,
       // Serial.print("Left and right percentages = "); Serial.print(leftPercentage);
       // Serial.print(", ");Serial.println(rightPercentage);
 
-      driver.forward(leftPercentage, rightPercentage);
-
       if(auto interval = timeSince_us(lastSample); interval >= SAMPLE_RATE_us){
         //  - MEAURE SPEEDS -
 
@@ -225,14 +223,18 @@ void forward(L293D& driver, HCSR04& ears,
 
       if(rightOnLine && !leftOnLine){
         Serial.println("Right on line");
-        driver.forward(leftPercentage * (1.0f - angleKp), rightPercentage * (1.0f + angleKp));
+        // driver.forward(leftPercentage * (1.0f - angleKp), rightPercentage * (1.0f + angleKp));
+        driver.forward(0.0f, rightPercentage);
+        Serial.print(leftPercentage * (1.0f - angleKp)); Serial.print(" ,"); Serial.println(rightPercentage * (1.0f + angleKp));
+
       } else if(leftOnLine && !rightOnLine){
-        Serial.println("left on line");
-        driver.forward(leftPercentage * (1.0f + angleKp), rightPercentage * (1.0f - angleKp));
+        Serial.print("left on line: ");
+        // driver.forward(leftPercentage * (1.0f + angleKp), rightPercentage * (1.0f - angleKp));
+        driver.forward(leftPercentage, 0.0f);
+        Serial.print(leftPercentage * (1.0f + angleKp)); Serial.print(" ,"); Serial.println(rightPercentage * (1.0f - angleKp));
       } else {
         // Both on or both off — go straight
         Serial.println("Default");
-        Serial.print("Left and right thresholds: "); Serial.print(leftThreshold); Serial.print(" "); Serial.println(rightThreshold);
         driver.forward(leftPercentage, rightPercentage);
       }
 
