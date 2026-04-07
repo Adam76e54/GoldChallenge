@@ -9,13 +9,13 @@ void setup(){
   noStroke();
   rectMode(CENTER);
   
-  ////connect to sam
-  //if(sam != null) {
-  //  sam = new Client(this, IP, PORT);
-  //  if(sam.active()){
-  //    sam.write("Connected");//this is actually essential. WiFiServer::available() only pulls in client who have data waiting so we need to write something to be seen
-  //  } 
-  //}
+  //connect to sam
+  if(sam != null) {
+    sam = new Client(this, IP, PORT);
+    if(sam.active()){
+      sam.write("Connected");//this is actually essential. WiFiServer::available() only pulls in client who have data waiting so we need to write something to be seen
+    } 
+  }
   
   panel = new ControlP5(this);
   
@@ -93,17 +93,18 @@ void setup(){
     
     PIDTextfields.add(field);
     
-    setupCommandHandlers();
     
-    actualTimes.add(1.0);
-    actualSpeeds.add(10.0);
-    
-    actualTimes.add(1.5);
-    actualSpeeds.add(10.0);
-    
-    actualTimes.add(10.0);
-    actualSpeeds.add(10.0);
+
   }
+    //actualTimes.add(1.0);
+    //actualSpeeds.add(10.0);
+    
+    //actualTimes.add(1.5);
+    //actualSpeeds.add(10.0);
+    
+    //actualTimes.add(10.0);
+    //actualSpeeds.add(10.0);
+  setupCommandHandlers();
 
   timeTextlabel = makeTextlabel(panel, "__TimeTextlabel", 15, timesY + 5, "Times");
   speedTextlabel = makeTextlabel(panel, "__SpeedTextlabel", 15, timesY + 5 + 2*size, "Speeds");
@@ -114,9 +115,9 @@ void setup(){
   mseTextlabel = makeTextlabel(panel, "MSE", width/2 - 30, 725, "MSE = 0");
   mseTextlabel.setFont(createFont("Arial", 24));
   
-  leftSlider = makeSlider(panel, Character.toString(comm_LEFT_IR), 1020, 120, 30, 300, 0, 1, "Left");  
+  leftSlider = makeSlider(panel, Character.toString(comm_LEFT_IR), 1020, 120, 30, 300, 0, 500, "Left");  
   leftSlider.setValue(0.3);
-  rightSlider = makeSlider(panel, Character.toString(comm_RIGHT_IR), 1090, 120, 30, 300, 0, 1, "Right");  
+  rightSlider = makeSlider(panel, Character.toString(comm_RIGHT_IR), 1090, 120, 30, 300, 0, 500, "Right");  
   rightSlider.setValue(0.3);
   
   stopToggle = makeToggle(panel, Character.toString(comm_STOP_TOGGLE), 540, 100, 150, 70, "Stop/Start");
@@ -126,21 +127,32 @@ void setup(){
 }
 
 void draw(){
-  //if (sam == null || !sam.active()) {
-  //  if (frameCount % 120 == 0) {
-  //    sam = new Client(this, IP, PORT);
-  //    if (sam != null && sam.active()) {
-  //      sam.write("hi\n");
-  //    }
-  //  }
-  //}
+  if (sam == null || !sam.active()) {
+    if (frameCount % 120 == 0) {
+      sam = new Client(this, IP, PORT);
+      if (sam != null && sam.active()) {
+        sam.write("hi\n");
+      }
+    }
+  }
   
   background(255);
   fill(0);
   textSize(32);
   textAlign(CENTER,CENTER);
 
-  drawPlot();
+  plot.beginDraw();
+  plot.drawBox();
+  plot.drawBox();
+  plot.drawGridLines(2);  
+  plot.drawXAxis();
+  plot.drawYAxis();
+  plot.drawTitle();
+  plot.drawPoints();
+  plot.setGridLineColor(color(220));  
+  plot.getLayer(REFERENCE).drawLines();
+  plot.getLayer(ACTUAL).drawLines();
+  plot.endDraw();
   
   clearTextfield(timeTextfields, timeFocuses);
   clearTextfield(speedTextfields, speedFocuses);
