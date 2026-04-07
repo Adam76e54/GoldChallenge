@@ -38,12 +38,6 @@ void decide(void*){
   while(true){
     xTaskDelayUntil(&lastWakeTime, period);
 
-    // Make non volatile local copies of the data, just for clarity
-    uint16_t left = sensors.left;
-    uint16_t right = sensors.right;
-
-
-
     // Fetch targets if changed
     if(xSemaphoreTake(arraySemaphore, pdMS_TO_TICKS(WAIT_TIME_MS)) == pdTRUE){
 
@@ -169,7 +163,7 @@ void forward(L293D& driver, HCSR04& ears,
 
         // Notify telemetry to send data.
         float velocity = (leftMeasurement_cms + rightMeasurement_cms) / 2.0f;
-        access(arraySemaphore, pdMS_TO_TICKS(5), [](){
+        access(arraySemaphore, pdMS_TO_TICKS(5), [&velocity, &currentTime_us](){
           data.currentActualSpeed = velocity;
           data.currentActualTime = currentTime_us;
         });
