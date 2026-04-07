@@ -18,18 +18,21 @@ namespace comm{
     handlerTable[static_cast<uint8_t>(comm::KI)] = &handleCoefficients;
     handlerTable[static_cast<uint8_t>(comm::KD)] = &handleCoefficients;
 
+    handlerTable[static_cast<uint8_t>(comm::TURNING_FACTOR)] = &handleTurningFactor;
+
+    handlerTable[static_cast<uint8_t>(comm::LEFT_IR)] = &handleThresholds;
+    handlerTable[static_cast<uint8_t>(comm::RIGHT_IR)] = &handleThresholds;
+
   }
 
   void print(Command&){
     // Serial.println("That worked");
   }
 
-  void handleStopToggle(Command& stop){
+  void handleStopToggle(Command&){
     if(xSemaphoreTake(stoppedSemaphore, pdMS_TO_TICKS(50)) == pdTRUE){
-      // Read in as a number since the GUI sends 0/1 not true/false
-      uint8_t value = atoi(stop.payload);
-      // Convert nicely to bool 
-      state.stopped = (value != 0);
+      // Toggle stopped
+      state.stopped = !state.stopped;
 
       // Serial.print("Recieved p = "); Serial.println(value);
       // Serial.print("Changed stopped to "); Serial.println(state.stopped ? "true" : "false");
@@ -75,6 +78,7 @@ namespace comm{
         
         case comm::RIGHT_IR:
           thresholds.right = atof(cmd.payload);
+          Serial.print("Changed right threshold = "); Serial.println(thresholds.right);
         break;
       }
 
@@ -87,7 +91,7 @@ namespace comm{
     if(xSemaphoreTake(angleSemaphore, pdMS_TO_TICKS(5)) == pdTRUE){
 
       angleCoefficients.kp = atof(cmd.payload);
-      
+      Serial.print("Changed turning factor = "); Serial.println(angleCoefficients.kp);
       xSemaphoreGive(angleSemaphore);
     }
   }
