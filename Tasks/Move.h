@@ -94,29 +94,29 @@ void forward(L293D& driver, HCSR04& ears,
 
 
   uint16_t leftThreshold = 0, rightThreshold = 0;
-  access(thresholdSemaphore, pdMS_TO_TICKS(50), [](){
+  access(thresholdSemaphore, pdMS_TO_TICKS(50), [&leftThreshold, &rightThreshold](){
     leftThreshold = thresholds.left;
     rightThreshold = thresholds.right;
   });
 
   // Adjust targetAngularVelocity
   float angleKp = 0;
-  access(angleSemaphore, pdMS_TO_TICKS(50), [&]{
+  access(angleSemaphore, pdMS_TO_TICKS(50), [&angleKp](){
     angleKp = angleCoefficients.kp;
     // Serial.print("Angle kp = "); Serial.println(angleKp);
   });
 
   uint8_t targetsIdx = 0, actualsIdx = 0;
-  uint16_t currentTargetSpeed = targetSpeeds[targetsIdx];
-  Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
+  uint16_t currentTargetSpeed_cms = targetSpeeds[targetsIdx];
+  Serial.print("Target velocity = "); Serial.println(currentTargetSpeed_cms);
   unsigned long currentChangeTime_us = (unsigned long)targetTimes[targetsIdx] * 1e6;
   Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
 
-  float leftPercentage = currentTargetSpeed / (float) MAX_CMS;
-  float rightPercentage = currentTargetSpeed / (float) MAX_CMS;
+  float leftPercentage = currentTargetSpeed_cms / (float) MAX_CMS;
+  float rightPercentage = currentTargetSpeed_cms / (float) MAX_CMS;
 
   constexpr unsigned long MAX_TIME_us = 60 * 1e6;
-  constexpr unsigned long SAMPLE_RATE_us = 1 * 1e6;
+  constexpr unsigned long SAMPLE_RATE_us = 8 * 1e5;
   const auto start = micros();
 
   auto lastSample = start;
@@ -143,9 +143,9 @@ void forward(L293D& driver, HCSR04& ears,
       ++targetsIdx;
       // Serial.print("Idx = "); Serial.println(idx);
       currentChangeTime_us += (unsigned long)targetTimes[targetsIdx] * 1e6;
-      currentTargetSpeed = targetSpeeds[targetsIdx];
+      currentTargetSpeed_cms = targetSpeeds[targetsIdx];
     
-      Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
+      Serial.print("Target velocity = "); Serial.println(currentTargetSpeed_cms);
       Serial.print("Target change time = "); Serial.println(currentChangeTime_us);
 
 
@@ -157,8 +157,8 @@ void forward(L293D& driver, HCSR04& ears,
 
     if(safe(ears)){
       // Serial.println("Safe");
-      Serial.print("Left and right percentages = "); Serial.print(leftPercentage);
-      Serial.print(", ");Serial.println(rightPercentage);
+      // Serial.print("Left and right percentages = "); Serial.print(leftPercentage);
+      // Serial.print(", ");Serial.println(rightPercentage);
 
       driver.forward(leftPercentage, rightPercentage);
 
@@ -185,7 +185,7 @@ void forward(L293D& driver, HCSR04& ears,
         float velocity = (leftMeasurement_cms + rightMeasurement_cms) / 2.0f;
         access(arraySemaphore, pdMS_TO_TICKS(5), [&velocity, &currentTime_us](){
           data.currentActualSpeed = velocity;
-          data.currentActualTime = currentTime_us;
+          data.currentActualTime = currentTime_us * 1e-6;
         });
         xTaskNotify(telemetryTaskHandle, actualsIdx, eSetValueWithoutOverwrite);
         ++actualsIdx;
@@ -194,34 +194,51 @@ void forward(L293D& driver, HCSR04& ears,
         lastSample += interval;
         lastLeftCount = leftCount;
         lastRightCount = rightCount;
+
+        // - PID ADJUSTMENT -
+        constexpr float SCALAR = 0.0001; // This is just to make the PID numbers bigger
+        float leftError = (currentTargetSpeed_cms - leftMeasurement_cms) * SCALAR;
+        float rightError = (currentTargetSpeed_cms - rightMeasurement_cms) * SCALAR;
+        Serial.print("Left and right errors = "); Serial.print(leftError);
+        Serial.print(", ");Serial.println(rightError);
+
+        float leftAdjustment = leftSpeedController.PID(leftError);
+        float rightAdjustement = rightSpeedController.PID(rightError);
+        Serial.print("Left and right adjustments = "); Serial.print(leftAdjustment);
+        Serial.print(", ");Serial.println(rightAdjustement);
+
+        leftPercentage += leftAdjustment;
+        rightPercentage += rightAdjustement;
       }
-
-      // - PID ADJUSTMENT -
-      constexpr float SCALAR = 0.0001; // This is just to make the PID numbers bigger
-      float leftError = (targetLeftSpeed - leftMeasurement_cms) * SCALAR;
-      float rightError = (targetRightSpeed - rightMeasurement_cms) * SCALAR;
-      Serial.print("Left and right errors = "); Serial.print(leftError);
-      Serial.print(", ");Serial.println(rightError);
-
-      float leftAdjustment = leftSpeedController.PID(leftError);
-      float rightAdjustement = rightSpeedController.PID(rightError);
-      Serial.print("Left and right adjustments = "); Serial.print(leftAdjustment);
-      Serial.print(", ");Serial.println(rightAdjustement);
-
-      leftPercentage += leftAdjustment;
-      rightPercentage += rightAdjustement;
 
       // - LINE FOLLOWING - 
       bool leftOnLine = false, rightOnLine = false;
       access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine, leftThreshold, rightThreshold]() {
         leftOnLine = sensors.left < leftThreshold;
         rightOnLine = sensors.right < rightThreshold;
+        Serial.println("Caught the sensor data");
       });
+
+
+      leftPercentage = constrain(leftPercentage, 0.0f, 1.0f);
+      rightPercentage = constrain(rightPercentage, 0.0f, 1.0f);
+
+      if(rightOnLine && !leftOnLine){
+        Serial.println("Right on line");
+        driver.forward(leftPercentage * (1.0f - angleKp), rightPercentage * (1.0f + angleKp));
+      } else if(leftOnLine && !rightOnLine){
+        Serial.println("left on line");
+        driver.forward(leftPercentage * (1.0f + angleKp), rightPercentage * (1.0f - angleKp));
+      } else {
+        // Both on or both off — go straight
+        Serial.println("Default");
+        Serial.print("Left and right thresholds: "); Serial.print(leftThreshold); Serial.print(" "); Serial.println(rightThreshold);
+        driver.forward(leftPercentage, rightPercentage);
+      }
 
     } else {
       // Serial.println("Unsafe");
       driver.brake(L293D_BRAKE_TIME);
-      break;
     }
 
 
@@ -230,6 +247,8 @@ void forward(L293D& driver, HCSR04& ears,
   access(stoppedSemaphore, pdMS_TO_TICKS(50), [](){
     state.stopped = true;
   });
+
+  Serial.println("Finished forward");
 
 }
 

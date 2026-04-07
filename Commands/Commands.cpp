@@ -70,11 +70,11 @@ namespace comm{
       constexpr uint16_t MAX = 1023;
       switch (cmd.name) {
         case comm::LEFT_IR:
-          thresholds.left = MAX * atof(cmd.payload);
+          thresholds.left = atof(cmd.payload);
         break;
         
         case comm::RIGHT_IR:
-          thresholds.right = MAX * atof(cmd.payload);
+          thresholds.right = atof(cmd.payload);
         break;
       }
 
