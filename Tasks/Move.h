@@ -99,6 +99,13 @@ void forward(L293D& driver, HCSR04& ears,
     rightThreshold = thresholds.right;
   });
 
+  // Adjust targetAngularVelocity
+  float angleKp = 0;
+  access(angleSemaphore, pdMS_TO_TICKS(50), [&]{
+    angleKp = angleCoefficients.kp;
+    // Serial.print("Angle kp = "); Serial.println(angleKp);
+  });
+
   uint8_t targetsIdx = 0, actualsIdx = 0;
   uint16_t currentTargetSpeed = targetSpeeds[targetsIdx];
   Serial.print("Target velocity = "); Serial.println(currentTargetSpeed);
@@ -189,32 +196,6 @@ void forward(L293D& driver, HCSR04& ears,
         lastRightCount = rightCount;
       }
 
-      // - ANGULAR VELOCITY AND TARGET SPEEDS COMPUTATION - 
-      constexpr float AXLE = 14.0f;
-
-
-      bool leftOnLine = false, rightOnLine = false;
-      access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine, leftThreshold, rightThreshold]() {
-        leftOnLine = sensors.left < leftThreshold;
-        rightOnLine = sensors.right < rightThreshold;
-      });
-
-      // Counters for estimating target angular velocity
-      static unsigned long rightIrCounter = 0, leftIrCounter = 0;
-      rightIrCounter = rightOnLine ? rightIrCounter + 1 : 0;
-      leftIrCounter = leftOnLine ? leftIrCounter + 1 : 0;
-
-      // Adjust targetAngularVelocity
-      float targetAngularVelocity = 0;
-      access(angleSemaphore, pdMS_TO_TICKS(5), [&]{
-        targetAngularVelocity = (rightIrCounter * rightIrCounter) * angleCoefficients.kp
-                                 - (leftIrCounter * leftIrCounter) * angleCoefficients.kp;
-      });
-
-      // Set left and right target speeds based on angular velocity target
-      float targetLeftSpeed = currentTargetSpeed - (targetAngularVelocity * AXLE / 2.0f);
-      float targetRightSpeed = currentTargetSpeed + (targetAngularVelocity * AXLE / 2.0f);
-
       // - PID ADJUSTMENT -
       constexpr float SCALAR = 0.0001; // This is just to make the PID numbers bigger
       float leftError = (targetLeftSpeed - leftMeasurement_cms) * SCALAR;
@@ -229,6 +210,13 @@ void forward(L293D& driver, HCSR04& ears,
 
       leftPercentage += leftAdjustment;
       rightPercentage += rightAdjustement;
+
+      // - LINE FOLLOWING - 
+      bool leftOnLine = false, rightOnLine = false;
+      access(irSemaphore, pdMS_TO_TICKS(5), [&leftOnLine, &rightOnLine, leftThreshold, rightThreshold]() {
+        leftOnLine = sensors.left < leftThreshold;
+        rightOnLine = sensors.right < rightThreshold;
+      });
 
     } else {
       // Serial.println("Unsafe");
