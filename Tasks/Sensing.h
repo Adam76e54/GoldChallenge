@@ -8,7 +8,7 @@ void irSensing(void*){
   constexpr TickType_t period = pdMS_TO_TICKS(20);
   TickType_t lastWakeTime = xTaskGetTickCount();
 
-  TCRT5000 left(1), right(2);
+  TCRT5000 left(A1), right(A3);
 
   Serial.println("Started ir sensing");
 
